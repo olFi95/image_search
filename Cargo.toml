@@ -1,0 +1,3 @@
+[workspace]
+members = ["client", "clip", "data", "server"]
+resolver = "3"

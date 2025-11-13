@@ -1,0 +1,12 @@
+[package]
+name = "clip"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+burn = { version = "0.19.1", features = ["wgpu", "vulkan", "webgpu"] }
+
+[build-dependencies]
+burn-import = { version = "0.19.1", features = ["onnx", "safetensors", "pytorch", "default"] }
+hf-hub = "0.4.3"
+which = "8.0.0"
