@@ -147,7 +147,7 @@ pub async fn embed_all_images_in_dir(
     }
 
     let index_update_result = db.query(
-        "DEFINE INDEX IF NOT EXISTS mt_pts ON image FIELDS image_embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;")
+        "DEFINE INDEX IF NOT EXISTS mt_pts ON image FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;")
         .query("
         REBUILD INDEX IF EXISTS mt_pts ON image;").await;
     match index_update_result {
