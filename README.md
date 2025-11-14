@@ -13,3 +13,6 @@ The model `clip-vit-large-patch14` is used in this project altough be it in two 
 
 - In the Image processor the Model run on accelerator hardware using Burn with the webgpu backend.
 - To Embed the text prompts EmbedAnything is used which runs only on CPU.
+# Build requirements
+- installed wasm toolchain `rustup target add wasm32-unknown-unknown`
+- installed trunk  `cargo install trunk --locked`
