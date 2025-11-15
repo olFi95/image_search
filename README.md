@@ -20,3 +20,4 @@ The model `clip-vit-large-patch14` is used in this project altough be it in two 
 
 # Run requirements
 - running surrealdb instance. For testing one can use `docker run --rm --pull always --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass root memory`.
+- set the `model-weights` parameter where the model-weights are stored. They get exported on build to `models/vision_model.mpk`

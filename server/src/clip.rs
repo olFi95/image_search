@@ -58,7 +58,7 @@ pub async fn embed_all_images_in_dir(
     let db: Surreal<Client> = init_database(&state.arguments).await?;
     let device = WgpuDevice::DefaultDevice;
     let model =
-        clip::clip_vit_large_patch14::Model::from_file("PATH_TO_MODEL.mpk", &device); // todo: fix this.
+        clip::clip_vit_large_patch14::Model::from_file(state.arguments.model_weights.as_str(), &device);
 
     let mut all_image_paths: Vec<String> = WalkDir::new(&state.arguments.media_dir)
         .into_iter()
