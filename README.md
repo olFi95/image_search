@@ -16,7 +16,18 @@ The model `clip-vit-large-patch14` is used in this project altough be it in two 
 # Build requirements
 - installed wasm toolchain `rustup target add wasm32-unknown-unknown`
 - installed trunk  `cargo install trunk --locked`
-- installed python version.
+- installed python version.  
+
+
+## Build the project
+
+```shell
+pushd clip
+  trunk build --release -d ../target/client/dist
+popd
+cargo build --release --bin server
+```
+
 
 # Run requirements
 - running surrealdb instance. For testing one can use `docker run --rm --pull always --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass root memory`.
