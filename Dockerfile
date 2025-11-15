@@ -20,9 +20,11 @@ WORKDIR /app
 RUN mkdir /pictures
 # Copy server binary and model file
 COPY --from=builder /app/target/release/server /app/server
+COPY --from=builder /app/target/client/dist /app/target/client/dist
 COPY --from=builder /app/models/vision_model.mpk /app/models/vision_model.mpk
 RUN chmod +x /app/server
+
 EXPOSE 3000
-ENTRYPOINT ["server", "-w", "/app/models/vision_model.mpk", "-m", "/pictures"]
+ENTRYPOINT ["/app/server", "-w", "/app/models/vision_model.mpk", "-m", "/pictures"]
 
 
