@@ -3,24 +3,18 @@ use crate::clip::init_embedder;
 use crate::database::init_database;
 use crate::search::{web_scan, web_search_text};
 use crate::server_arguments::ServerArguments;
-use axum::extract::Query;
-use axum::routing::{get_service, post, trace};
-use axum::{Json, Router, routing::get};
+use axum::routing::{post, trace};
+use axum::{routing::get, Router};
 use clap::Parser;
-use data::{ImageReference, SearchParams, SearchResponse};
 use embed_anything::embeddings::embed::Embedder;
-use log::{info, trace};
+use env_logger::Env;
+use log::info;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::net::SocketAddr;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use surrealdb::engine::remote::ws::{Client, Ws};
-use surrealdb::opt::auth::Root;
-use surrealdb::syn::token::Keyword::Search;
 use surrealdb::{RecordId, Surreal};
 use tokio::sync::Mutex;
-use tonic::{Request, Response, Status, transport::Server};
-use tonic_web::GrpcWebLayer;
+use tonic::Status;
 use tower_http::services::{ServeDir, ServeFile};
 
 mod clip;
@@ -41,9 +35,8 @@ pub struct AppState {
     pub embedder: Arc<Mutex<Embedder>>,
 }
 
-#[tokio::main]
-async fn main() {
-    env_logger::init();
+async fn tokio_main() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cla = ServerArguments::parse();
 
     let static_dir = "target/client/dist";
@@ -69,4 +62,16 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+fn main() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        // increase thread stack size to 32 MB to prevent stack overflow when embedding images with WGPU
+        .thread_stack_size(32 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(async {
+            tokio_main().await;
+        })
 }

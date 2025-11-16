@@ -8,9 +8,7 @@ use data::{ImageReference, ImageReferenceEmbedding, SearchParams, SearchResponse
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use surrealdb::{Error, RecordId};
-use tokio::runtime::Builder;
-use tracing::field::debug;
-use walkdir::WalkDir;
+use tokio::runtime::Handle;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -104,13 +102,8 @@ pub async fn web_search_text(
 pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
     let state_cloned = state.clone();
 
-    Builder::new_multi_thread()
-        .thread_name("embedder-task")
-        .thread_stack_size(32 * 1024 * 1024) // 32 MB stack
-        .enable_all()
-        .build()
-        .unwrap()
-        .spawn(async move {
+    let runtime = Handle::current();
+    let result = runtime.spawn(async move {
             let result = embed_all_images_in_dir(&state_cloned).await;
             match result {
                 Ok(_) => info!("embedded all images successfully."),
@@ -119,8 +112,12 @@ pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
                 }
             }
         })
-        .await
-        .unwrap();
+        .await;
+
+    match result {
+        Ok(_) => info!("Image embedding task completed."),
+        Err(e) => error!("Failed to join image embedding task: {}", e),
+    }
 
     StatusCode::OK
 }

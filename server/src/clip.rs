@@ -63,7 +63,7 @@ pub async fn embed_all_images_in_dir(
     let mut all_image_paths: Vec<String> = WalkDir::new(&state.arguments.media_dir)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.metadata().unwrap().is_file())
+        .filter(|e| e.metadata().is_ok_and(|file| file.is_file()))
         .filter(|e| {
             e.path().extension().is_some_and(|ext| {
                 matches!(
