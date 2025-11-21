@@ -16,7 +16,35 @@ The model `clip-vit-large-patch14` is used in this project altough be it in two 
 # Build requirements
 - installed wasm toolchain `rustup target add wasm32-unknown-unknown`
 - installed trunk  `cargo install trunk --locked`
-- installed python version.
+- installed python version.  
+
+
+## Build the project
+
+### Local
+```shell
+pushd clip
+  trunk build --release -d ../target/client/dist
+popd
+cargo build --release --bin server
+```
+
+### Docker
+```shell
+docker build -t image-search .
+docker run --rm -p 3000:3000 \                                                                                                                                                                                                                                    8m 27.538s
+    -e RUST_LOG=info \
+    --device /dev/dri:/dev/dri \ # GPU Passthrough
+    -v ~/Pictures:/pictures \
+    --name embedded-server \
+    localhost/embedder-server
+```
+### Podman
+For podman we need to build and run the image as root to get access to the GPU devices.
+```shell
+sudo podman build -t localhost/embedder-server .
+
+```
 
 # Run requirements
 - running surrealdb instance. For testing one can use `docker run --rm --pull always --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass root memory`.

@@ -76,6 +76,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .input(upgraded_model.to_str().unwrap())
         .out_dir("clip_vit_large_patch14")
         .run_from_script();
+    let dest_dir = PathBuf::from("../models");
+    if !dest_dir.exists() {
+        fs::create_dir_all(&dest_dir)?;
+    }
     fs::copy(out_dir.join("clip_vit_large_patch14").join("vision_model.mpk"), PathBuf::from("../models/vision_model.mpk"))?;
     Ok(())
 }
