@@ -150,7 +150,7 @@ pub async fn embed_all_images_in_dir(
     }
 }
 
-fn image_prepare_resnet(img: DynamicImage) -> Vec<f32> {
+pub fn image_prepare_resnet(img: DynamicImage) -> Vec<f32> {
     let resized = img.resize_exact(224, 224, image::imageops::FilterType::CatmullRom);
     let rgb = resized.to_rgb8();
     let pixels = rgb.as_raw().as_slice(); // &[u8] slice in RGBRGBRGB...

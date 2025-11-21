@@ -39,3 +39,10 @@ anyhow = "1.0.99"
 
 [profile.dev]
 opt-level = 1               # Use slightly better optimizations, reduces debug build size
+
+[dev-dependencies]
+criterion = { version = "0.7.0", features = ["async", "async_futures"] }
+
+[[bench]]
+harness = false
+name = "server_bench"

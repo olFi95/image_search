@@ -156,7 +156,7 @@ mod tests {
     fn tes_average_vector() {
         let a = vec![1.0, 2.0, 4.0, 4.0, 10.0];
         let b = vec![1.0, 1.0, 2.0, 4.0, 0.0];
-        let result = average_slices(&vec![a.as_slice(), b.as_slice()]);
+        let result = average_slices(&vec![&a, &b]);
         assert_eq!(result, vec![1.0, 1.5, 3.0, 4.0, 5.0]);
     }
 }
