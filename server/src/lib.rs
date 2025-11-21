@@ -11,16 +11,16 @@ use env_logger::Env;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use image::DynamicImage;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::{RecordId, Surreal};
 use tokio::sync::Mutex;
 use tonic::Status;
 use tower_http::services::{ServeDir, ServeFile};
-
-mod clip;
-mod database;
-mod search;
-mod server_arguments;
+pub mod clip;
+pub mod database;
+pub mod search;
+pub mod server_arguments;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DbImage {
