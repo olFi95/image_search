@@ -16,6 +16,9 @@ RUN cargo build --release --bin server
 
 # --- Stage 2: Runtime ---
 FROM debian:trixie-slim
+RUN apt-get update \
+    && apt-get install -y libvulkan1 mesa-vulkan-drivers vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN mkdir /pictures
 # Copy server binary and model file
@@ -25,6 +28,5 @@ COPY --from=builder /app/models/vision_model.mpk /app/models/vision_model.mpk
 RUN chmod +x /app/server
 
 EXPOSE 3000
-ENTRYPOINT ["/app/server", "-w", "/app/models/vision_model.mpk", "-m", "/pictures"]
-
+ENTRYPOINT ["/app/server", "-w", "/app/models/vision_model.mpk", "-a", "0.0.0.0", "-m", "/pictures"]
 
