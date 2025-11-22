@@ -4,7 +4,7 @@ use clip::text_embedder::TextEmbedder;
 use clip::utils::image_to_resnet;
 use criterion::async_executor::FuturesExecutor;
 use criterion::{criterion_group, criterion_main, Criterion};
-use image::DynamicImage;
+use image::{open, DynamicImage};
 use std::hint::black_box;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -64,8 +64,22 @@ fn bench_image_preparation(c: &mut Criterion) {
     }
 }
 
+fn bench_load_image(c: &mut Criterion) {
+    c.bench_function("Load reference image",
+        |b| {
+            b.iter(||{
+                let _ = image_to_resnet(black_box(
+                    open("../testdata/pictures/cat.jpg").expect("cannot open image")
+                ));
+            });
+        },
+    );
+}
+
+
 
 criterion_group!(benches,
+    bench_load_image,
     bench_image_preparation,
     bench_text_embedding,
     bench_image_embedding_inference
