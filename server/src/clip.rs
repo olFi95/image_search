@@ -4,7 +4,6 @@ use crate::search::ImageType;
 use burn::prelude::Tensor;
 use burn_wgpu::{Wgpu, WgpuDevice};
 use data::ImagePathResult;
-use embed_anything::embeddings::embed::{EmbedImage, Embedder};
 use image::{DynamicImage, open};
 use log::{info, error};
 use rand::prelude::SliceRandom;
@@ -15,28 +14,12 @@ use std::path::PathBuf;
 use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::Client;
 use walkdir::WalkDir;
+use clip::utils::image_to_resnet;
 
 pub async fn clip(state: &AppState, input: String) -> Vec<f32> {
     let clip_embedder = state.embedder.lock().await;
-    let embedding_result = &clip_embedder.embed(&[&input], None, None).await.unwrap()[0];
-    embedding_result.to_dense().unwrap()
-}
-
-pub async fn clip_image_path(
-    state: &AppState,
-    image: PathBuf,
-) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-    let clip_embedder = state.embedder.lock().await;
-    let embedding_result = clip_embedder.embed_image(image, None).await?;
-    let embedding_data = embedding_result.embedding;
-    Ok(embedding_data.to_dense()?)
-}
-
-pub async fn init_embedder() -> Result<Embedder, Box<dyn std::error::Error + Send + Sync>> {
-    let clip_embedder =
-        Embedder::from_pretrained_hf("Clip", "openai/clip-vit-large-patch14", None, None, None)?;
-    info!("Embedder initialized");
-    Ok(clip_embedder)
+    clip_embedder.embed_text_single(input.as_str()).await
+        .expect("Something went wrong embedding text")
 }
 
 pub async fn embed_all_images_in_dir(
@@ -95,7 +78,7 @@ pub async fn embed_all_images_in_dir(
             .par_iter()
             .filter_map(|image_path| match open(image_path) {
                 Ok(img) => {
-                    let prepared = image_prepare_resnet(img);
+                    let prepared = image_to_resnet(img);
                     Some(prepared)
                 }
                 Err(err) => {
@@ -150,29 +133,6 @@ pub async fn embed_all_images_in_dir(
     }
 }
 
-pub fn image_prepare_resnet(img: DynamicImage) -> Vec<f32> {
-    let resized = img.resize_exact(224, 224, image::imageops::FilterType::CatmullRom);
-    let rgb = resized.to_rgb8();
-    let pixels = rgb.as_raw().as_slice(); // &[u8] slice in RGBRGBRGB...
-
-    let mean = [0.485f32, 0.456, 0.406];
-    let std = [0.229f32, 0.224, 0.225];
-
-    // Output in CHW format: [C][H][W]
-    let mut data = vec![0.0f32; 3 * 224 * 224];
-
-    for i in 0..(224 * 224) {
-        let r = pixels[i * 3] as f32 / 255.0;
-        let g = pixels[i * 3 + 1] as f32 / 255.0;
-        let b = pixels[i * 3 + 2] as f32 / 255.0;
-
-        data[i] = (r - mean[0]) / std[0]; // Red channel
-        data[224 * 224 + i] = (g - mean[1]) / std[1]; // Green channel
-        data[2 * 224 * 224 + i] = (b - mean[2]) / std[2]; // Blue channel
-    }
-
-    data
-}
 #[cfg(test)]
 mod tests {
     use std::ffi::OsStr;

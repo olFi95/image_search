@@ -1,22 +1,23 @@
 #![recursion_limit = "256"]
-use crate::clip::init_embedder;
 use crate::database::init_database;
 use crate::search::{web_scan, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
 use axum::{routing::get, Router};
 use clap::Parser;
-use embed_anything::embeddings::embed::Embedder;
+use ::clip::text_embedder::TextEmbedder;
+// Re-export clip module contents for benching purposes
+pub use clip::*;
 use env_logger::Env;
+use image::DynamicImage;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use surrealdb::engine::remote::ws::Client;
-use image::DynamicImage;
-use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::{RecordId, Surreal};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
+
 pub mod clip;
 pub mod database;
 pub mod search;
@@ -32,7 +33,7 @@ struct DbImage {
 pub struct AppState {
     pub arguments: ServerArguments,
     pub db: Arc<Mutex<Surreal<Client>>>,
-    pub embedder: Arc<Mutex<Embedder>>,
+    pub embedder: Arc<Mutex<TextEmbedder>>,
 }
 
 async fn tokio_main() -> anyhow::Result<()> {
@@ -44,7 +45,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let app_state = AppState {
         arguments: cla.clone(),
         db: Arc::new(Mutex::new(init_database(&cla).await.unwrap())),
-        embedder: Arc::new(Mutex::new(init_embedder().await.unwrap())),
+        embedder: Arc::new(Mutex::new(TextEmbedder::new())),
     };
 
     let media_dir = cla.shellexpand_media_dir()?;
