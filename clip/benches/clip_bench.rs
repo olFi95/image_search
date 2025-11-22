@@ -1,13 +1,14 @@
 use burn::Tensor;
 use burn_wgpu::{Wgpu, WgpuDevice};
+use clip::text_embedder::TextEmbedder;
+use clip::utils::image_to_resnet;
 use criterion::async_executor::FuturesExecutor;
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::env::current_dir;
+use image::DynamicImage;
 use std::hint::black_box;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use clip::text_embedder::TextEmbedder;
+use std::sync::Arc;
 
 fn bench_text_embedding(c: &mut Criterion) {
     c.bench_function("text_embedding using EmbedAnything for single text prompt", |b| {
@@ -21,7 +22,6 @@ fn bench_text_embedding(c: &mut Criterion) {
 
 
 fn bench_image_embedding_inference(c: &mut Criterion) {
-    println!("{}", current_dir().unwrap().display());
     let device = WgpuDevice::DefaultDevice;
     let model =
         clip::clip_vit_large_patch14::Model::from_file("../models/vision_model.mpk", &device);
@@ -41,7 +41,34 @@ fn bench_image_embedding_inference(c: &mut Criterion) {
     }
 }
 
+fn bench_image_preparation(c: &mut Criterion) {
+    for image in [
+        DynamicImage::new_rgb8(640, 480),
+        DynamicImage::new_rgb8(1280, 720),
+        DynamicImage::new_rgb8(1920, 1080),
+        DynamicImage::new_rgb8(3840, 2160),
+    ] {
+        c.bench_function(
+            format!(
+                "Preprocessing of DynamicImage {}x{} for embedding.",
+                image.width(),
+                image.height()
+            )
+            .as_str(),
+            |b| {
+                b.iter(||{
+                    let _ = image_to_resnet(black_box(image.clone()));
+                });
+            },
+        );
+    }
+}
 
-criterion_group!(benches, bench_image_embedding_inference, bench_text_embedding);
+
+criterion_group!(benches,
+    bench_image_preparation,
+    bench_text_embedding,
+    bench_image_embedding_inference
+);
 criterion_main!(benches);
 

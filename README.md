@@ -43,9 +43,27 @@ docker run --rm -p 3000:3000 \                                                  
 For podman we need to build and run the image as root to get access to the GPU devices.
 ```shell
 sudo podman build -t localhost/embedder-server .
-
 ```
 
 # Run requirements
 - running surrealdb instance. For testing one can use `docker run --rm --pull always --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass root memory`.
 - set the `model-weights` parameter where the model-weights are stored. They get exported on build to `models/vision_model.mpk`
+
+# Benchmarks
+Start the benchmarks with.
+```shell
+cargo bench --workspace
+```
+Get the report from [target/criterion/report/index.html](target/criterion/report/index.html).
+
+## My results
+Setup: AMD Ryzen 7 5800X, 64GB RAM, AMD Radeon 7900 XTX, Manjaro Linux  
+
+| Benchmark                            | Time (Mean) | Time (Median) | Std Dev   |
+|--------------------------------------|-------------|---------------|-----------|
+| Embedding of a single string         | 175.99 ms   | 174.89 ms     | 11.483 ms |
+| Embedding of a single image          | 37.496 ms   | 31.678 ms     | 8.6860 ms |
+| Embedding of 10 images in a batch    | 346.90 ms   | 258.21 ms     | 120.07 ms |
+| Embedding of 100 images in a batch   | 3.3392 s    | 2.4832 s      | 1.2344 s  |
+| Preprocessing of a picture 1920x1080 | 15.149 ms   | 14.890 ms     | 899.07 µs | 
+| Preprocessing of a picture 3840x2160 | 52.186 ms   | 52.002 ms     | 935.37 µs | 
