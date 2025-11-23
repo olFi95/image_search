@@ -1,4 +1,6 @@
-use std::net::{IpAddr, SocketAddr};
+use std::io;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use clap::Parser;
 
 #[derive(Parser, Debug, Clone)]
@@ -26,5 +28,9 @@ pub struct ServerArguments {
 impl ServerArguments {
     pub fn get_socket_addr(&self) -> SocketAddr {
         SocketAddr::new(self.addr.parse().unwrap(), self.port)
+    }
+
+    pub fn shellexpand_media_dir(&self) -> io::Result<PathBuf> {
+        expanduser::expanduser(&self.media_dir)
     }
 }

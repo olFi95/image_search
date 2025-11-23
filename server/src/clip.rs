@@ -3,30 +3,17 @@ use crate::database::init_database;
 use crate::search::ImageType;
 use burn::prelude::Tensor;
 use burn_wgpu::{Wgpu, WgpuDevice};
-use data::{ImagePathResult, ImageReference, ImageReferenceEmbedding};
+use data::ImagePathResult;
 use embed_anything::embeddings::embed::{EmbedImage, Embedder};
-use embed_anything::embeddings::local::clip::ClipEmbedder;
-use image::{DynamicImage, ImageReader, open};
-use log::{debug, error};
-use log::{info, trace};
+use image::{DynamicImage, open};
+use log::{info, error};
 use rand::prelude::SliceRandom;
-use rand::rng;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
-use std::cmp::min;
 use std::collections::HashSet;
-use std::error::Error;
-use std::ffi::OsStr;
-use std::fs;
-use std::io::Cursor;
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::Client;
-use surrealdb::error::Db;
-use surrealdb::sql::Thing;
-use tokio::stream;
-use urlencoding::encode;
 use walkdir::WalkDir;
 
 pub async fn clip(state: &AppState, input: String) -> Vec<f32> {
@@ -59,10 +46,15 @@ pub async fn embed_all_images_in_dir(
     let device = WgpuDevice::DefaultDevice;
     let model =
         clip::clip_vit_large_patch14::Model::from_file(state.arguments.model_weights.as_str(), &device);
-
-    let mut all_image_paths: Vec<String> = WalkDir::new(&state.arguments.media_dir)
+    let media_dir = state.arguments.shellexpand_media_dir()?;
+    info!("Searching directory {media_dir:?}.");
+    let mut all_image_paths: Vec<String> = WalkDir::new(&media_dir)
+        .follow_links(true)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(|entry| {
+            // permission errors are encountered here
+            entry.inspect_err(|error| error!("Image load error: {:?}", error))
+        }.ok())
         .filter(|e| e.metadata().is_ok_and(|file| file.is_file()))
         .filter(|e| {
             e.path().extension().is_some_and(|ext| {
@@ -75,10 +67,8 @@ pub async fn embed_all_images_in_dir(
         .map(|e| e.path().display().to_string())
         .collect();
     all_image_paths.shuffle(&mut rand::rng());
-    info!(
-        "Found {} images in directory",
-        all_image_paths.clone().len()
-    );
+    let num_images = all_image_paths.clone().len();
+    info!("Found {num_images} images in directory.");
     for image_paths in all_image_paths.chunks(500) {
         let mut response = db
             .query("SELECT image_path FROM image WHERE image_path IN $paths")

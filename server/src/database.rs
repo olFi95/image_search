@@ -1,6 +1,5 @@
 use crate::server_arguments::ServerArguments;
 use log::info;
-use std::sync::LazyLock;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 use surrealdb::{Error, Surreal};

@@ -1,13 +1,13 @@
 use crate::clip::{clip, embed_all_images_in_dir};
 use crate::{AppState, DbImage};
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Router, debug_handler, response::IntoResponse, routing::get};
-use data::{ImageReference, ImageReferenceEmbedding, SearchParams, SearchResponse};
+use axum::{debug_handler, response::IntoResponse};
+use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::{Error, RecordId};
+use surrealdb::RecordId;
 use tokio::runtime::Handle;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -28,7 +28,7 @@ pub async fn web_search_text(
     let mut query_vector = embedding.clone();
 
     trace!("image_paths: {:?}", params.referenced_images);
-    if params.referenced_images.len() > 0 {
+    if !params.referenced_images.is_empty() {
         let image_paths: Vec<String> = params
             .referenced_images
             .into_iter()
@@ -54,7 +54,7 @@ pub async fn web_search_text(
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
         debug!("marked_image_embeddings {}", marked_image.len());
-        if marked_image.len() > 0 {
+        if !marked_image.is_empty() {
             let slices = marked_image
                 .iter()
                 .map(|embedding| &embedding.embedding)
