@@ -80,7 +80,7 @@ impl Preprocessor {
     }
 
     pub async fn preprocess(&self, data: &DynamicImage) -> Vec<f32> {
-        let input = data.resize_exact(224, 224, image::imageops::FilterType::CatmullRom).to_rgb8().into_raw();
+        let input = data.resize_exact(224, 224, image::imageops::FilterType::Nearest).to_rgb8().into_raw();
         let input: &[u8]= bytemuck::cast_slice(input.as_slice());
         let output: &[f32] = &[0.0; 3 * 224 * 224];
         let input_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -88,10 +88,11 @@ impl Preprocessor {
             contents: input,
             usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE,
         });
-        let output_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("output buffer CHW"),
-            contents: bytemuck::cast_slice(output),
-            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE,
+            size: (3 * 224 * 224 * std::mem::size_of::<f32>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
         });
         let params_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("params buffer"),
@@ -145,8 +146,12 @@ impl Preprocessor {
             });
             compute_pass.set_pipeline(&compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
-            compute_pass.dispatch_workgroups(1, 1, 1);
-        }
+
+            let workgroup_size = 16u32;
+            let dispatch_x = (224 + workgroup_size - 1) / workgroup_size;
+            let dispatch_y = (224 + workgroup_size - 1) / workgroup_size;
+
+            compute_pass.dispatch_workgroups(dispatch_x, dispatch_y, 1);        }
 
         let command_buffer = compute_encoder.finish();
         let preprocess_index = self.queue.submit(Some(command_buffer));

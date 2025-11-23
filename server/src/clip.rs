@@ -1,3 +1,4 @@
+use futures::stream::iter;
 use crate::AppState;
 use crate::database::init_database;
 use crate::search::ImageType;
@@ -10,11 +11,19 @@ use rand::prelude::SliceRandom;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::error::Error;
+use std::ffi::OsStr;
+use std::fs;
+use std::io::Cursor;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use futures::StreamExt;
 use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::Client;
 use walkdir::WalkDir;
 use clip::utils::image_to_resnet;
+use picture_preprocessing::preprocessor::Preprocessor;
 
 pub async fn clip(state: &AppState, input: String) -> Vec<f32> {
     let clip_embedder = state.embedder.lock().await;
@@ -73,6 +82,19 @@ pub async fn embed_all_images_in_dir(
             &image_paths.len(),
             new_paths.len()
         );
+        // let preprocessor = Preprocessor::new().await;
+        // let mut all_prepared_image_buffers: Vec<Vec<f32>> = vec![];
+        // for new_path in &new_paths {
+        //     match open(&new_path) {
+        //         Ok(img) => {
+        //             let prepared = preprocessor.preprocess(&img).await;
+        //             all_prepared_image_buffers.push(prepared);
+        //         }
+        //         Err(err) => {
+        //             error!("Failed to open image {}: {}", new_path, err);
+        //         }
+        //     }
+        // }
 
         let all_prepared_image_buffers: Vec<Vec<f32>> = new_paths
             .par_iter()

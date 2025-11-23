@@ -6928,6 +6928,7 @@ name = "picture_preprocessing"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "futures",
  "futures-channel",
  "image",
@@ -8795,8 +8796,10 @@ dependencies = [
  "data",
  "env_logger",
  "expanduser",
+ "futures",
  "image",
  "log",
+ "picture_preprocessing",
  "rand 0.9.2",
  "rayon",
  "serde",

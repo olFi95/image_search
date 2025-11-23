@@ -11,6 +11,7 @@ panic = "abort"
 
 [dependencies]
 clip = { path = "../clip" }
+picture_preprocessing = { path = "../picture_preprocessing" }
 axum = { version = "0.8.4", features = ["macros"] }
 tonic = { version = "0.14.1", features = ["transport"] }
 tokio = { version = "1.47.1", features = ["full"] }
@@ -32,4 +33,5 @@ burn-wgpu = { version = "0.19.1" }
 image = "0.25.8"
 rayon = "1.11.0"
 bytemuck = "1.23.2"
+futures = "0.3.31"
 anyhow = "1.0.99"
