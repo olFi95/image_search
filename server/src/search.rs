@@ -8,7 +8,6 @@ use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
-use tokio::runtime::Handle;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -103,27 +102,19 @@ pub async fn web_search_text(
 
 #[debug_handler]
 pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
-    let state_cloned = state.clone();
+    info!("Starting image embedding...");
 
-    let runtime = Handle::current();
-    let result = runtime.spawn(async move {
-            let result = embed_all_images_in_dir(&state_cloned).await;
-            match result {
-                Ok(_) => info!("embedded all images successfully."),
-                Err(e) => {
-                    error!("Error embedding images: {}", e);
-                }
-            }
-        })
-        .await;
+    // Starte die Embedding-Pipeline direkt (nicht-blockierend durch interne async Tasks)
+    tokio::task::spawn(async move {
+        match embed_all_images_in_dir(&state).await {
+            Ok(_) => info!("Successfully embedded all images."),
+            Err(e) => error!("Error embedding images: {}", e),
+        }
+    });
 
-    match result {
-        Ok(_) => info!("Image embedding task completed."),
-        Err(e) => error!("Failed to join image embedding task: {}", e),
-    }
-
-    StatusCode::OK
+    StatusCode::ACCEPTED
 }
+
 fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
     assert!(!vectors.is_empty(), "Input must not be empty");
 
