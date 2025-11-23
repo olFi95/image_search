@@ -25,7 +25,7 @@ fn bench_image_embedding_inference(c: &mut Criterion) {
     let device = WgpuDevice::DefaultDevice;
     let model =
         clip::clip_vit_large_patch14::Model::from_file("../models/vision_model.mpk", &device);
-    for batch_size in [1, 5, 10, 20, 50, 100] {
+    for batch_size in [1, 5, 10, 20] {
         c.bench_function(format!("vision embedding using burn/wgpu batch of {batch_size}").as_str(), |b| {
             let image_buffer = black_box(vec![0;224*224*3*batch_size]);
 
