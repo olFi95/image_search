@@ -69,7 +69,8 @@ pub async fn embed_all_images_in_dir(
     all_image_paths.shuffle(&mut rand::rng());
     let num_images = all_image_paths.clone().len();
     info!("Found {num_images} images in directory.");
-    for image_paths in all_image_paths.chunks(500) {
+    let image_chunk_size = state.arguments.image_chunk_size;
+    for image_paths in all_image_paths.chunks(image_chunk_size) {
         let mut response = db
             .query("SELECT image_path FROM image WHERE image_path IN $paths")
             .bind(("paths", image_paths.to_vec()))

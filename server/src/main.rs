@@ -34,7 +34,7 @@ pub struct AppState {
     pub embedder: Arc<Mutex<Embedder>>,
 }
 
-async fn tokio_main() {
+async fn tokio_main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cla = ServerArguments::parse();
 
@@ -46,11 +46,12 @@ async fn tokio_main() {
         embedder: Arc::new(Mutex::new(init_embedder().await.unwrap())),
     };
 
+    let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
         .route("/search", post(web_search_text))
         .route("/scan", get(web_scan))
         .with_state(app_state)
-        .nest_service("/media", ServeDir::new(&cla.media_dir))
+        .nest_service("/media", ServeDir::new(&media_dir))
         .fallback_service(
             ServeDir::new(static_dir)
                 .not_found_service(ServeFile::new(format!("{}/index.html", static_dir))),
@@ -59,8 +60,8 @@ async fn tokio_main() {
 
     axum_server::bind(cla.get_socket_addr())
         .serve(app.into_make_service())
-        .await
-        .unwrap();
+        .await?;
+    Ok(())
 }
 
 fn main() {
@@ -71,6 +72,6 @@ fn main() {
         .build()
         .unwrap()
         .block_on(async {
-            tokio_main().await;
+            tokio_main().await.expect("Tokio main failed");
         })
 }

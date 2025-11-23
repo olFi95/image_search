@@ -9,6 +9,8 @@ pub struct ServerArguments {
     pub model_weights: String,
     #[clap(short = 'm', long = "media-dir", default_value = "~/Pictures")]
     pub media_dir: String,
+    #[clap(short = 'c', long = "chunk-size", default_value_t = 500)]
+    pub image_chunk_size: usize,
     #[clap(short = 'a', long = "addr", default_value = "127.0.0.1")]
     pub addr: String,
     #[clap(short = 'p', long = "port", default_value_t = 3000)]

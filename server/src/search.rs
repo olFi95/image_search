@@ -27,13 +27,16 @@ pub async fn web_search_text(
     let embedding = clip(&state, params.q).await;
     let mut query_vector = embedding.clone();
 
-    trace!("image_paths: {:?}", params.referenced_images);
+    info!("image_paths: {:?}", params.referenced_images);
+    let media_dir = state.arguments.shellexpand_media_dir().expect("media dir could not be loaded");
+    let media_dir_str = media_dir.into_os_string().into_string().expect("media dir could not be converted to string");
+
     if !params.referenced_images.is_empty() {
         let image_paths: Vec<String> = params
             .referenced_images
             .into_iter()
             .filter(|img| img.starts_with("media/"))
-            .map(|img| img.replacen("media/", state.arguments.media_dir.as_str(), 1))
+            .map(|img| img.replacen("media/", &media_dir_str, 1))
             .collect::<Vec<String>>();
         trace!("image_paths: {image_paths:?}");
 
@@ -91,7 +94,7 @@ pub async fn web_search_text(
         .into_iter()
         .map(|img| ImageReference {
             id: img.id.to_string(),
-            image_path: img.image_path.replace(&state.arguments.media_dir, "media/"),
+            image_path: img.image_path.replace(&media_dir_str, "media/"),
         })
         .collect();
 
