@@ -1525,26 +1525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "c2rust-bitfields"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46dc7d2bffa0d0b3d47eb2dc69973466858281446c2ac9f6d8a10e92ab1017df"
-dependencies = [
- "c2rust-bitfields-derive",
-]
-
-[[package]]
-name = "c2rust-bitfields-derive"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebe1117afa5937ce280034e31fa1e84ed1824a252f75380327eed438535333f8"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "camino"
 version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2695,22 +2675,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cubecl-spirv"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdf0a7f8903817dc5915db733213054cb191e672c32dfc2b66ad06cce5338684"
-dependencies = [
- "bitflags 2.10.0",
- "cubecl-common",
- "cubecl-core",
- "cubecl-opt",
- "cubecl-runtime",
- "half",
- "hashbrown 0.15.5",
- "tracel-rspirv",
-]
-
-[[package]]
 name = "cubecl-std"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2733,7 +2697,6 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d59a7d737259a784247595e2f0cc5a97d3e50f45cdaefbd4cc7d7fd2126f7a58"
 dependencies = [
- "ash",
  "async-channel",
  "bytemuck",
  "cfg-if",
@@ -2741,14 +2704,12 @@ dependencies = [
  "cubecl-common",
  "cubecl-core",
  "cubecl-runtime",
- "cubecl-spirv",
  "derive-new",
  "derive_more 2.0.1",
  "half",
  "hashbrown 0.15.5",
  "log",
  "sanitize-filename",
- "tracel-ash",
  "wgpu",
 ]
 
@@ -10211,16 +10172,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
-name = "tracel-ash"
-version = "0.38.0+1.3.296"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7318626319ea7b43d20b9c374f273b1b25600b8d8ddd103e209751f67fee67ad"
-dependencies = [
- "ash",
- "c2rust-bitfields",
-]
-
-[[package]]
 name = "tracel-llvm"
 version = "20.1.4-5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10284,16 +10235,6 @@ checksum = "89c805f361a6f927ba3c404866bd2e6568cb4ae638328305648917ff05ca2413"
 dependencies = [
  "bindgen",
  "tracel-llvm-bundler",
-]
-
-[[package]]
-name = "tracel-rspirv"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c142cfe863e8082bec205dd283a467d0399e9bda2ee65b51391cdc3458d132b2"
-dependencies = [
- "bitflags 2.10.0",
- "rustc-hash 2.1.1",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-burn = { version = "0.19.1", features = ["wgpu", "vulkan", "webgpu"] }
+burn = { version = "0.19.1", features = ["wgpu"] }
 burn-wgpu = { version = "0.19.1" }
 image = "0.25.8"
 embed_anything = "0.6.5"
