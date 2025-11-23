@@ -65,5 +65,5 @@ Setup: AMD Ryzen 7 5800X, 64GB RAM, AMD Radeon 7900 XTX, Manjaro Linux
 | Embedding of a single image          | 37.496 ms   | 31.678 ms     | 8.6860 ms |
 | Embedding of 10 images in a batch    | 346.90 ms   | 258.21 ms     | 120.07 ms |
 | Embedding of 100 images in a batch   | 3.3392 s    | 2.4832 s      | 1.2344 s  |
-| Preprocessing of a picture 1920x1080 | 15.149 ms   | 14.890 ms     | 899.07 µs | 
-| Preprocessing of a picture 3840x2160 | 52.186 ms   | 52.002 ms     | 935.37 µs | 
+| Preprocessing of a picture 1920x1080 | 2.5358 ms   | 2.5364 ms     | 39.870 µs | 
+| Preprocessing of a picture 3840x2160 | 5.9815 ms   | 5.9764 ms     | 144.31 µs | 
