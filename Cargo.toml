@@ -1,4 +1,4 @@
 [workspace]
-members = ["client", "clip", "data", "server"]
+members = ["client", "clip", "data", "picture_preprocessing", "server"]
 resolver = "3"
 default-members = ["server"]

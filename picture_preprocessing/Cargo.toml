@@ -1,0 +1,13 @@
+[package]
+name = "picture_preprocessing"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+image = "0.25.9"
+wgpu = "27.0.1"
+bytemuck = "1.24.0"
+pollster = "0.4.0"
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+futures = "0.3.31"
+futures-channel = "0.3.31"
