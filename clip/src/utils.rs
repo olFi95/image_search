@@ -5,7 +5,7 @@ use log::info;
 
 
 pub fn image_to_resnet(img: DynamicImage) -> Vec<f32> {
-    let resized = img.resize_exact(224, 224, image::imageops::FilterType::CatmullRom);
+    let resized = img.resize_exact(224, 224, image::imageops::FilterType::Nearest);
     let rgb = resized.to_rgb8();
     let pixels = rgb.as_raw().as_slice(); // &[u8] slice in RGBRGBRGB...
 
