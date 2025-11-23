@@ -19,38 +19,45 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let idx = (y * params.width + x);
 
     // ---- Read 3 bytes (RGB) ----
-    // Each u32 holds 4 bytes. We find which u32 and which byte.
+    // Each u32 holds 4 bytes in little-endian order.
     let byteIndex = idx * 3u;
 
     let wordIndex = byteIndex / 4u;
     let byteInWord = byteIndex % 4u;
 
-    let word = inputBytes[wordIndex];
-
-    // Extract bytes safely
-    let b0 = (word >> (8u * byteInWord)) & 0xFFu;
-
-    // For bytes 2 and 3 we may spill into next word
     var r: u32;
     var g: u32;
     var b: u32;
 
-    // Read R
-    r = b0;
+    // We need to read 3 consecutive bytes starting at byteIndex
+    // They might span across 2 u32 words
 
-    // Read G
-    if (byteInWord == 3u) {
-        g = inputBytes[wordIndex + 1u] & 0xFFu;
-    } else {
-        g = (word >> (8u * (byteInWord + 1u))) & 0xFFu;
-    }
-
-    // Read B
-    if (byteInWord >= 2u) {
-        let nextWord = inputBytes[wordIndex + 1u];
-        b = (nextWord >> (8u * (byteInWord - 2u))) & 0xFFu;
-    } else {
-        b = (word >> (8u * (byteInWord + 2u))) & 0xFFu;
+    if (byteInWord == 0u) {
+        // RGB all in same word: [R, G, B, X]
+        let word = inputBytes[wordIndex];
+        r = (word >> 0u) & 0xFFu;
+        g = (word >> 8u) & 0xFFu;
+        b = (word >> 16u) & 0xFFu;
+    } else if (byteInWord == 1u) {
+        // RGB spans: [X, R, G, B]
+        let word = inputBytes[wordIndex];
+        r = (word >> 8u) & 0xFFu;
+        g = (word >> 16u) & 0xFFu;
+        b = (word >> 24u) & 0xFFu;
+    } else if (byteInWord == 2u) {
+        // RGB spans 2 words: [X, X, R, G] [B, ...]
+        let word0 = inputBytes[wordIndex];
+        let word1 = inputBytes[wordIndex + 1u];
+        r = (word0 >> 16u) & 0xFFu;
+        g = (word0 >> 24u) & 0xFFu;
+        b = (word1 >> 0u) & 0xFFu;
+    } else { // byteInWord == 3u
+        // RGB spans 2 words: [X, X, X, R] [G, B, ...]
+        let word0 = inputBytes[wordIndex];
+        let word1 = inputBytes[wordIndex + 1u];
+        r = (word0 >> 24u) & 0xFFu;
+        g = (word1 >> 0u) & 0xFFu;
+        b = (word1 >> 8u) & 0xFFu;
     }
 
     // ---- Convert to float (normalized 0.0–1.0) ----

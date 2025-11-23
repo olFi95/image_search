@@ -205,6 +205,7 @@ impl Preprocessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{DynamicImage, RgbImage};
 
     #[tokio::test]
     async fn test_preprocessor() {
@@ -212,5 +213,92 @@ mod tests {
         let img = image::open("../testdata/pictures/cat.jpg").unwrap();
         let result = preprocessor.preprocess(&img).await;
         assert_eq!(result.len(), 3 * 224 * 224);
+    }
+
+    #[tokio::test]
+    async fn test_shader_logic_and_pixel_values() {
+        // Create a test image with known values
+        // We'll create a 224x224 image so the resize doesn't alter our test pixels
+        let mut img = RgbImage::new(224, 224);
+
+        // Fill with a base color (black)
+        for pixel in img.pixels_mut() {
+            *pixel = image::Rgb([0, 0, 0]);
+        }
+
+        // Set specific test pixels with known values
+        img.put_pixel(0, 0, image::Rgb([255, 0, 0]));     // Red at top-left
+        img.put_pixel(223, 0, image::Rgb([0, 255, 0]));   // Green at top-right
+        img.put_pixel(0, 223, image::Rgb([0, 0, 255]));   // Blue at bottom-left
+        img.put_pixel(223, 223, image::Rgb([128, 128, 128])); // Gray at bottom-right
+        img.put_pixel(112, 112, image::Rgb([255, 255, 255])); // White at center
+
+        let dynamic_img = DynamicImage::ImageRgb8(img);
+
+        let preprocessor = Preprocessor::new().await;
+        let result = preprocessor.preprocess(&dynamic_img).await;
+
+        // Assert correct output size
+        let expected_size = 3 * 224 * 224;
+        assert_eq!(result.len(), expected_size, "Output size mismatch: expected {} (3 * 224 * 224), got {}", expected_size, result.len());
+
+        // Assert all values are in valid range [0.0, 1.0]
+        let min_val = result.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max_val = result.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+
+        assert!(min_val >= 0.0, "Minimum value {} is below 0.0", min_val);
+        assert!(max_val <= 1.0, "Maximum value {} is above 1.0", max_val);
+
+        // Assert CHW layout is correct
+        let pixels_per_channel = 224 * 224;
+
+        // Check that we have exactly 3 channels
+        assert_eq!(result.len(), 3 * pixels_per_channel, "CHW layout incorrect: expected {} values for 3 channels", 3 * pixels_per_channel);
+
+        // Helper function to get pixel value from CHW layout
+        let get_pixel = |x: u32, y: u32| -> (f32, f32, f32) {
+            let idx = (y * 224 + x) as usize;
+            let r = result[idx];
+            let g = result[pixels_per_channel + idx];
+            let b = result[2 * pixels_per_channel + idx];
+            (r, g, b)
+        };
+
+        // Test pixel (0, 0) - should be red (255, 0, 0) = (1.0, 0.0, 0.0)
+        let (r, g, b) = get_pixel(0, 0);
+        assert!((r - 1.0).abs() < 0.01, "Red pixel: R channel should be ~1.0, got {}", r);
+        assert!(g.abs() < 0.01, "Red pixel: G channel should be ~0.0, got {}", g);
+        assert!(b.abs() < 0.01, "Red pixel: B channel should be ~0.0, got {}", b);
+
+        // Test pixel (223, 0) - should be green (0, 255, 0) = (0.0, 1.0, 0.0)
+        let (r, g, b) = get_pixel(223, 0);
+        assert!(r.abs() < 0.01, "Green pixel: R channel should be ~0.0, got {}", r);
+        assert!((g - 1.0).abs() < 0.01, "Green pixel: G channel should be ~1.0, got {}", g);
+        assert!(b.abs() < 0.01, "Green pixel: B channel should be ~0.0, got {}", b);
+
+        // Test pixel (0, 223) - should be blue (0, 0, 255) = (0.0, 0.0, 1.0)
+        let (r, g, b) = get_pixel(0, 223);
+        assert!(r.abs() < 0.01, "Blue pixel: R channel should be ~0.0, got {}", r);
+        assert!(g.abs() < 0.01, "Blue pixel: G channel should be ~0.0, got {}", g);
+        assert!((b - 1.0).abs() < 0.01, "Blue pixel: B channel should be ~1.0, got {}", b);
+
+        // Test pixel (223, 223) - should be gray (128, 128, 128) = (0.502, 0.502, 0.502)
+        let (r, g, b) = get_pixel(223, 223);
+        let expected_gray = 128.0 / 255.0; // ~0.502
+        assert!((r - expected_gray).abs() < 0.01, "Gray pixel: R channel should be ~{:.3}, got {}", expected_gray, r);
+        assert!((g - expected_gray).abs() < 0.01, "Gray pixel: G channel should be ~{:.3}, got {}", expected_gray, g);
+        assert!((b - expected_gray).abs() < 0.01, "Gray pixel: B channel should be ~{:.3}, got {}", expected_gray, b);
+
+        // Test pixel (112, 112) - should be white (255, 255, 255) = (1.0, 1.0, 1.0)
+        let (r, g, b) = get_pixel(112, 112);
+        assert!((r - 1.0).abs() < 0.01, "White pixel: R channel should be ~1.0, got {}", r);
+        assert!((g - 1.0).abs() < 0.01, "White pixel: G channel should be ~1.0, got {}", g);
+        assert!((b - 1.0).abs() < 0.01, "White pixel: B channel should be ~1.0, got {}", b);
+
+        // Test a black pixel (should be most of the image)
+        let (r, g, b) = get_pixel(50, 50);
+        assert!(r.abs() < 0.01, "Black pixel: R channel should be ~0.0, got {}", r);
+        assert!(g.abs() < 0.01, "Black pixel: G channel should be ~0.0, got {}", g);
+        assert!(b.abs() < 0.01, "Black pixel: B channel should be ~0.0, got {}", b);
     }
 }
