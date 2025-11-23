@@ -154,9 +154,11 @@ mod tests {
     use super::*;
     #[test]
     fn tes_average_vector() {
-        let a = vec![1.0, 2.0, 4.0, 4.0, 10.0];
+        let a = vec![1.0, 2.0, 4.0, 4.0, 10.0f32];
         let b = vec![1.0, 1.0, 2.0, 4.0, 0.0];
-        let result = average_slices(&vec![a.as_slice(), b.as_slice()]);
+        let a_vec = a.as_slice().to_vec();
+        let b_vec = b.as_slice().to_vec();
+        let result = average_slices(&vec![&a_vec, &b_vec]);
         assert_eq!(result, vec![1.0, 1.5, 3.0, 4.0, 5.0]);
     }
 }

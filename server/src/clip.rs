@@ -1,3 +1,4 @@
+use image::ImageDecoder;
 use crate::AppState;
 use crate::database::init_database;
 use crate::search::ImageType;
@@ -5,7 +6,7 @@ use burn::prelude::Tensor;
 use burn_wgpu::{Wgpu, WgpuDevice};
 use data::ImagePathResult;
 use embed_anything::embeddings::embed::{EmbedImage, Embedder};
-use image::{DynamicImage, open};
+use image::{DynamicImage, ImageReader};
 use log::{info, error};
 use rand::prelude::SliceRandom;
 use rayon::iter::ParallelIterator;
@@ -93,9 +94,8 @@ pub async fn embed_all_images_in_dir(
 
         let all_prepared_image_buffers: Vec<Vec<f32>> = new_paths
             .par_iter()
-            .filter_map(|image_path| match open(image_path) {
-                Ok(img) => {
-                    let prepared = image_prepare_resnet(img);
+            .filter_map(|image_path| match image_prepare_resnet(image_path) {
+                Ok(prepared) => {
                     Some(prepared)
                 }
                 Err(err) => {
@@ -137,6 +137,7 @@ pub async fn embed_all_images_in_dir(
             .await?;
     }
 
+    info!("Rebuilding image index.");
     let index_update_result = db.query(
         "DEFINE INDEX IF NOT EXISTS mt_pts ON image FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;")
         .query("
@@ -150,7 +151,12 @@ pub async fn embed_all_images_in_dir(
     }
 }
 
-fn image_prepare_resnet(img: DynamicImage) -> Vec<f32> {
+fn image_prepare_resnet(image_path: &str) -> anyhow::Result<Vec<f32>> {
+    // not sure if the orientation matters when embedding
+    let mut decoder = ImageReader::open(image_path)?.into_decoder()?;
+    let orientation = decoder.orientation()?;
+    let mut img = DynamicImage::from_decoder(decoder)?;
+    img.apply_orientation(orientation);
     let resized = img.resize_exact(224, 224, image::imageops::FilterType::CatmullRom);
     let rgb = resized.to_rgb8();
     let pixels = rgb.as_raw().as_slice(); // &[u8] slice in RGBRGBRGB...
@@ -171,7 +177,7 @@ fn image_prepare_resnet(img: DynamicImage) -> Vec<f32> {
         data[2 * 224 * 224 + i] = (b - mean[2]) / std[2]; // Blue channel
     }
 
-    data
+    Ok(data)
 }
 #[cfg(test)]
 mod tests {
