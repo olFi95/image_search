@@ -21,6 +21,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::Client;
+use tracing::field::debug;
 use walkdir::WalkDir;
 use clip::utils::image_to_resnet;
 use picture_preprocessing::preprocessor::Preprocessor;
@@ -82,6 +83,10 @@ pub async fn embed_all_images_in_dir(
             &image_paths.len(),
             new_paths.len()
         );
+        if new_paths.len()==0 {
+            debug("No new images to process, skipping chunk.");
+            continue;
+        }
         // let preprocessor = Preprocessor::new().await;
         // let mut all_prepared_image_buffers: Vec<Vec<f32>> = vec![];
         // for new_path in &new_paths {
@@ -142,6 +147,7 @@ pub async fn embed_all_images_in_dir(
             .await?;
     }
 
+    info!("Done embedding images, updating index.");
     let index_update_result = db.query(
         "DEFINE INDEX IF NOT EXISTS mt_pts ON image FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;")
         .query("
