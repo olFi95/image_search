@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let status = Command::new(&pip_path)
-        .args(["install", "onnx", "onnx_graphsurgeon"])
+        .args(["install", "onnx==1.19.1", "onnx_graphsurgeon==0.5.8"])
         .status()?;
     if !status.success() {
         panic!("Failed to install required Python packages");
