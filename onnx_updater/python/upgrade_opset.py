@@ -20,6 +20,10 @@ def upgrade_opset(input_path: str, output_path: str, target_opset: int = 16):
     # Convert to desired opset
     current_opset = model.opset_import[0].version
     print(f"Current opset: {current_opset} -> Target opset: {target_opset}")
+    if current_opset > target_opset:
+        print("Warning: Downgrading opset versions not necessary.")
+        onnx.save(model, output_path)
+        return
     model = version_converter.convert_version(model, target_opset)
 
     # Clean up and sort graph using GraphSurgeon
