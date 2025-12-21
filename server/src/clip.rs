@@ -84,6 +84,7 @@ pub async fn embed_faces(
 
             let face_embedding = FaceEmbedding{
                 id: None,
+                parent_image: element.id.clone(),
                 score: face.bbox.score,
                 bbox: [face.bbox.xmin, face.bbox.ymin, face.bbox.xmax - face.bbox.xmin, face.bbox.ymax - face.bbox.ymin],
                 embedding,
@@ -110,6 +111,7 @@ pub struct ImageFaceEmbeddingCheckResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceEmbedding {
     pub id: Option<Thing>,
+    pub parent_image: Thing,
     pub score: f32, // confidence score of the face detection
     pub bbox: [f32; 4], // x, y, width, height
     pub embedding: Vec<f32>,
