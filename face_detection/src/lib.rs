@@ -1,10 +1,8 @@
 pub mod face_detector;
+mod face_embedder;
 
 extern crate alloc;
 
-use burn::Tensor;
-use image::DynamicImage;
-use std::sync::Arc;
 
 pub mod arcface {
     include!(concat!(

@@ -20,7 +20,7 @@ impl FaceDetector {
     }
 
     /// Detect all faces in an image. returns a vector of cropped face images.
-    pub fn detect(&self, img: &DynamicImage) -> Vec<DynamicImage> {
+    pub fn detect(&self, img: &DynamicImage) -> Vec<DetectedFace> {
 
         let scaled_image = scale_image::<640, 640>(img.clone());
         let input =
@@ -77,11 +77,16 @@ impl FaceDetector {
         let mut faces = vec![];
         for b in &final_boxes {
             let face = img.clone().crop(b.xmin as u32, b.ymin as u32, (b.xmax - b.xmin) as u32, (b.ymax- b.ymin) as u32);
-            faces.push(face)
+            faces.push(DetectedFace{face_image: face, bbox: b.clone()});
         }
 
         faces
     }
+}
+
+pub struct DetectedFace {
+    pub face_image: DynamicImage,
+    pub bbox: BBox, // Bounding box in the original image
 }
 
 
