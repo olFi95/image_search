@@ -1,4 +1,4 @@
-use crate::clip::{clip, embed_all_images_in_dir};
+use crate::clip::{clip, embed_all_images_in_dir, embed_faces};
 use crate::{AppState, DbImage};
 use axum::Json;
 use axum::extract::State;
@@ -8,6 +8,7 @@ use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
+use tokio::join;
 use tokio::runtime::Handle;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -105,25 +106,30 @@ pub async fn web_search_text(
 pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
     let state_cloned = state.clone();
 
-    let runtime = Handle::current();
-    let result = runtime.spawn(async move {
-            let result = embed_all_images_in_dir(&state_cloned).await;
-            match result {
-                Ok(_) => info!("embedded all images successfully."),
-                Err(e) => {
-                    error!("Error embedding images: {}", e);
-                }
-            }
-        })
-        .await;
+    // embed_faces ist !Send → spawn_blocking benutzen
+    let face_result = tokio::task::spawn_blocking(move || {
+        // block_on, um async embed_faces zu warten
+        tokio::runtime::Handle::current().block_on(embed_faces(&state_cloned))
+    })
+        .await
+        .unwrap_or_else(|e| Err(Box::<dyn std::error::Error + Send + Sync>::from(e)));
 
-    match result {
-        Ok(_) => info!("Image embedding task completed."),
-        Err(e) => error!("Failed to join image embedding task: {}", e),
+    match face_result {
+        Ok(_) => info!("embedded all faces successfully."),
+        Err(e) => error!("Error embedding faces: {}", e),
     }
+
+    // embed_all_images_in_dir ist Send → kann normal awaited werden
+    // let state_cloned = state.clone();
+    // let image_result = embed_all_images_in_dir(&state_cloned).await;
+    // match image_result {
+    //     Ok(_) => info!("embedded all images successfully."),
+    //     Err(e) => error!("Error embedding images: {}", e),
+    // }
 
     StatusCode::OK
 }
+
 fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
     assert!(!vectors.is_empty(), "Input must not be empty");
 

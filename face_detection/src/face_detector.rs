@@ -176,12 +176,12 @@ fn iou(a: &BBox, b: &BBox) -> f32 {
 }
 
 #[derive(Clone, Debug)]
-struct BBox {
-    xmin: f32,
-    ymin: f32,
-    xmax: f32,
-    ymax: f32,
-    score: f32,
+pub struct BBox {
+    pub xmin: f32,
+    pub ymin: f32,
+    pub xmax: f32,
+    pub ymax: f32,
+    pub score: f32,
 }
 
 

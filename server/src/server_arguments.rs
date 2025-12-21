@@ -5,8 +5,12 @@ use clap::Parser;
 
 #[derive(Parser, Debug, Clone)]
 pub struct ServerArguments {
-    #[clap(short = 'w', long = "model-weights", default_value = "./models/vision_model.mpk")]
-    pub model_weights: String,
+    #[clap(long = "clip-model-weights", default_value = "./models/vision_model.bpk")]
+    pub clip_model_weights: String,
+    #[clap(long = "arcface-model-weights", default_value = "./models/arcface_model.bpk")]
+    pub arcface_model_weights: String,
+    #[clap(long = "yolo-model-weights", default_value = "./models/yolo.bpk")]
+    pub yolo_model_weights: String,
     #[clap(short = 'm', long = "media-dir", default_value = "~/Pictures")]
     pub media_dir: String,
     #[clap(short = 'c', long = "chunk-size", default_value_t = 500)]

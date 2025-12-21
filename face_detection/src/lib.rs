@@ -1,5 +1,5 @@
 pub mod face_detector;
-mod face_embedder;
+pub mod face_embedder;
 
 extern crate alloc;
 

@@ -36,6 +36,7 @@ image = "0.25.8"
 rayon = "1.11.0"
 bytemuck = "1.23.2"
 anyhow = "1.0.99"
+face_detection = { path = "../face_detection" }
 
 [profile.dev]
 opt-level = 1               # Use slightly better optimizations, reduces debug build size
