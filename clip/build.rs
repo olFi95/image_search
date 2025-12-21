@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !dest_dir.exists() {
         fs::create_dir_all(&dest_dir)?;
     }
-    fs::copy(out_dir.join("clip_vit_large_patch14").join("vision_model.mpk"), PathBuf::from("../models/vision_model.mpk"))?;
+    fs::copy(out_dir.join("clip_vit_large_patch14").join("vision_model.bpk"), PathBuf::from("../models/vision_model.bpk"))?;
     Ok(())
 
 }

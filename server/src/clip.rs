@@ -44,7 +44,7 @@ pub async fn embed_all_images_in_dir(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let db: Surreal<Client> = init_database(&state.arguments).await?;
     let device = WgpuDevice::DefaultDevice;
-    let model =
+    let model: clip::clip_vit_large_patch14::Model<Wgpu> =
         clip::clip_vit_large_patch14::Model::from_file(state.arguments.model_weights.as_str(), &device);
     let media_dir = state.arguments.shellexpand_media_dir()?;
     info!("Searching directory {media_dir:?}.");

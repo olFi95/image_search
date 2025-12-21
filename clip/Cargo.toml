@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-burn = { version = "0.19.1", features = ["wgpu", "vulkan", "webgpu"] }
+burn = { version = "0.20.0-pre.6", features = ["wgpu", "vulkan", "webgpu"] }
+burn-store = "0.20.0-pre.6"
 
 [build-dependencies]
-burn-import = { version = "0.19.1", features = ["onnx", "safetensors", "pytorch", "default"] }
+burn-import = { version = "0.20.0-pre.6", features = ["onnx", "safetensors", "pytorch", "default"] }
 hf-hub = "0.4.3"
 which = "8.0.0"
 onnx_updater = { path = "../onnx_updater" }
