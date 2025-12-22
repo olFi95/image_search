@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 use crate::clip::init_embedder;
 use crate::database::init_database;
-use crate::search::{web_scan, web_search_text};
+use crate::search::{indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
 use axum::{routing::get, Router};
@@ -21,6 +21,7 @@ mod database;
 mod search;
 mod server_arguments;
 pub mod metadata_provider;
+pub mod metadata_indexer;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DbImage {
@@ -50,7 +51,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
         .route("/search", post(web_search_text))
-        .route("/scan", get(web_scan))
+        .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))
         .fallback_service(

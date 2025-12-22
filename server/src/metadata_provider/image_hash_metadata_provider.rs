@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{BaseImage, Metadata, MetadataProvider};
+use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use surrealdb::engine::remote::ws::Client;
@@ -12,8 +12,8 @@ pub struct ImageHashMetadata{
     pub hash: [u8; 32]
 }
 
-impl MetadataProvider<BaseImage, ImageHashMetadata> for ImageHashMetadataProvider {
-    fn extract(&self, base_images: &Vec<BaseImage>) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
+impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetadataProvider {
+    fn extract(&self, base_images: &Vec<BaseImageWithImage>) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
 
         let mut results = Vec::with_capacity(base_images.len());
 
@@ -28,7 +28,7 @@ impl MetadataProvider<BaseImage, ImageHashMetadata> for ImageHashMetadataProvide
                 Metadata{
                     id: None,
                     metadata: Some(ImageHashMetadata{hash:hash_bytes, hash_type: String::from("SHA256")}),
-                    base: base_image.id.clone(),
+                    base: base_image.base_image.id.clone(),
                 }
             )
         }
@@ -38,20 +38,67 @@ impl MetadataProvider<BaseImage, ImageHashMetadata> for ImageHashMetadataProvide
 }
 
 
-pub struct ImageHashMetadataRepository;
+pub struct ImageHashMetadataRepository{
+    db: Surreal<Client>,
+}
 impl ImageHashMetadataRepository {
-    pub async fn insert_many(
+    pub async fn new(db: Surreal<Client>) -> Self{
+        Self::prepare_repository(&db).await.expect("cannot prepare repository with indexes");
+        Self { db }
+    }
+    async fn prepare_repository(
         db: &Surreal<Client>,
+    ) -> anyhow::Result<()> {
+        db.query(
+            r#"
+            DEFINE INDEX IF NOT EXISTS image_hash_unique_base
+            ON image_hash_metadata
+            FIELDS base
+            UNIQUE;
+            "#,
+        )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn insert_many(
+        &self,
         items: Vec<Metadata<ImageHashMetadata>>,
-    ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>
-    > {
-        Ok(db.insert::<Vec<Metadata<ImageHashMetadata>>>("image_hash_metadata")
-            .content(items)
-            .await?)
+    ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
+
+        if items.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut inserted = Vec::new();
+
+        for item in items {
+            let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
+
+            let mut response = self.db
+                .query(
+                    r#"
+                UPSERT image_hash_metadata
+                SET base = $base, metadata = $metadata
+                WHERE base = $base;
+                "#
+                )
+                .bind(("base", base_id.clone()))
+                .bind(("metadata", item.metadata.clone()))
+                .await?;
+
+            // SurrealDB liefert die erstellten oder vorhandenen Datensätze zurück
+            if let Ok(mut rows) = response.take::<Vec<Metadata<ImageHashMetadata>>>(0) {
+                inserted.append(&mut rows);
+            }
+        }
+
+        Ok(inserted)
     }
 
     pub async fn find_by_bases(
-        db: &Surreal<Client>,
+        &self,
         base_ids: Vec<RecordId>,
     ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
 
@@ -59,7 +106,7 @@ impl ImageHashMetadataRepository {
             return Ok(Vec::new());
         }
 
-        let mut response = db
+        let mut response = self.db
             .query(
                 "SELECT *
              FROM image_hash_metadata
@@ -72,7 +119,7 @@ impl ImageHashMetadataRepository {
         Ok(items)
     }
     pub async fn find_by_base_images(
-        db: &Surreal<Client>,
+        &self,
         images: &[BaseImage],
     ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
 
@@ -81,7 +128,7 @@ impl ImageHashMetadataRepository {
             .filter_map(|img| img.id.clone())
             .collect();
 
-        Self::find_by_bases(db, base_ids).await
+        self.find_by_bases(base_ids).await
     }
 }
 

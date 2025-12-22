@@ -52,7 +52,6 @@ pub async fn embed_faces(
     let db: Surreal<Client> = init_database(&state.arguments).await?;
     let device = Arc::new(WgpuDevice::DefaultDevice);
     let media_dir = state.arguments.shellexpand_media_dir()?;
-    let image_chunk_size = state.arguments.image_chunk_size;
 
     let face_detector = FaceDetector::new(&state.arguments.yolo_model_weights, device.clone());
     let face_embedder = FaceEmbedder::new(&state.arguments.arcface_model_weights, device.clone());
@@ -212,7 +211,7 @@ pub async fn embed_all_images_in_dir(
     }
 }
 
-fn get_all_directories_in_dir(media_dir: &PathBuf) -> Vec<String> {
+pub fn get_all_directories_in_dir(media_dir: &PathBuf) -> Vec<String> {
     let mut all_image_paths: Vec<String> = WalkDir::new(&media_dir)
         .follow_links(true)
         .into_iter()

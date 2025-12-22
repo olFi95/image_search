@@ -1,3 +1,4 @@
+use std::sync::mpsc::channel;
 use crate::clip::{clip, embed_all_images_in_dir, embed_faces};
 use crate::{AppState, DbImage};
 use axum::Json;
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 use tokio::join;
 use tokio::runtime::Handle;
+use crate::metadata_indexer::MetadataIndexer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -103,29 +105,33 @@ pub async fn web_search_text(
 }
 
 #[debug_handler]
-pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
+pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse {
     let state_cloned = state.clone();
 
-    // embed_faces ist !Send → spawn_blocking benutzen
-    let face_result = tokio::task::spawn_blocking(move || {
-        // block_on, um async embed_faces zu warten
-        tokio::runtime::Handle::current().block_on(embed_faces(&state_cloned))
-    })
-        .await
-        .unwrap_or_else(|e| Err(Box::<dyn std::error::Error + Send + Sync>::from(e)));
+    let metadata_indexer = MetadataIndexer::new(state_cloned.db.lock().await.clone());
+    metadata_indexer.index_metadata(state_cloned.arguments.shellexpand_media_dir().unwrap()).await.unwrap();
 
-    match face_result {
-        Ok(_) => info!("embedded all faces successfully."),
-        Err(e) => error!("Error embedding faces: {}", e),
-    }
 
-    // embed_all_images_in_dir ist Send → kann normal awaited werden
-    // let state_cloned = state.clone();
-    // let image_result = embed_all_images_in_dir(&state_cloned).await;
-    // match image_result {
-    //     Ok(_) => info!("embedded all images successfully."),
-    //     Err(e) => error!("Error embedding images: {}", e),
+    // // embed_faces ist !Send → spawn_blocking benutzen
+    // let face_result = tokio::task::spawn_blocking(move || {
+    //     // block_on, um async embed_faces zu warten
+    //     tokio::runtime::Handle::current().block_on(embed_faces(&state_cloned))
+    // })
+    //     .await
+    //     .unwrap_or_else(|e| Err(Box::<dyn std::error::Error + Send + Sync>::from(e)));
+    //
+    // match face_result {
+    //     Ok(_) => info!("embedded all faces successfully."),
+    //     Err(e) => error!("Error embedding faces: {}", e),
     // }
+    //
+    // // embed_all_images_in_dir ist Send → kann normal awaited werden
+    // // let state_cloned = state.clone();
+    // // let image_result = embed_all_images_in_dir(&state_cloned).await;
+    // // match image_result {
+    // //     Ok(_) => info!("embedded all images successfully."),
+    // //     Err(e) => error!("Error embedding images: {}", e),
+    // // }
 
     StatusCode::OK
 }
