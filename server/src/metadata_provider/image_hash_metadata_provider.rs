@@ -1,3 +1,5 @@
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -14,28 +16,31 @@ pub struct ImageHashMetadata{
 
 impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetadataProvider {
     fn extract(&self, base_images: &Vec<BaseImageWithImage>) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
+        // Parallel über die Bilder iterieren
+        let results: Vec<Metadata<ImageHashMetadata>> = base_images
+            .par_iter()  // rayon parallel iterator
+            .map(|base_image| {
+                let rgb = base_image.image.to_rgb8();
+                let mut hasher = Sha256::new();
+                hasher.update(rgb.as_raw());
+                let hash_result = hasher.finalize();
 
-        let mut results = Vec::with_capacity(base_images.len());
+                let mut hash_bytes = [0u8; 32];
+                hash_bytes.copy_from_slice(&hash_result[..]);
 
-        for base_image in base_images {
-            let rgb = base_image.image.to_rgb8();
-            let mut hasher = Sha256::new();
-            hasher.update(rgb.as_raw());
-            let result = hasher.finalize();
-            let mut hash_bytes = [0u8; 32];
-            hash_bytes.copy_from_slice(&result[..]);
-            results.push(
-                Metadata{
+                Metadata {
                     id: None,
-                    metadata: Some(ImageHashMetadata{hash:hash_bytes, hash_type: String::from("SHA256")}),
+                    metadata: Some(ImageHashMetadata {
+                        hash: hash_bytes,
+                        hash_type: "SHA256".to_string(),
+                    }),
                     base: base_image.base_image.id.clone(),
                 }
-            )
-        }
+            })
+            .collect();
 
         Ok(results)
-    }
-}
+    }}
 
 
 pub struct ImageHashMetadataRepository{
@@ -134,25 +139,31 @@ impl ImageHashMetadataRepository {
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata_provider::metadata_provider::{BaseImage, MetadataProvider};
+    use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, MetadataProvider};
     use image::{ColorType, DynamicImage};
 
     #[test]
     fn test_image_hash_metadata_provider() {
         let images = vec![
-            BaseImage{
-                id: None,
-                path: String::from("/test1.jpg"),
+            BaseImageWithImage{
+                base_image: BaseImage {
+                    id: None,
+                    path: String::from("/test1.jpg"),
+                },
                 image: DynamicImage::new(10, 10, ColorType::Rgb8)
             },
-            BaseImage{
-                id: None,
-                path: String::from("/test2.jpg"),
+                BaseImageWithImage{
+                base_image: BaseImage {
+                    id: None,
+                    path: String::from("/test2.jpg"),
+                },
                 image: DynamicImage::new(10, 10, ColorType::Rgb16)
             },
-            BaseImage{
-                id: None,
-                path: String::from("/test3.jpg"),
+            BaseImageWithImage{
+                base_image: BaseImage {
+                    id: None,
+                    path: String::from("/test3.jpg"),
+                },
                 image: DynamicImage::new(20, 10, ColorType::Rgb8)
             }
         ];

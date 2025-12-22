@@ -28,8 +28,7 @@ pub struct BaseImageWithImage {
 }
 
 impl BaseImage {
-    pub(crate) fn open(image_path: PathBuf) -> Self {
-        let image = open(&image_path).expect("Failed to open image");
+    pub(crate) fn new(image_path: PathBuf) -> Self {
         Self {
             id: None,
             path: image_path.into_os_string().to_str().expect("cannot convert provided path to string").to_string(),
