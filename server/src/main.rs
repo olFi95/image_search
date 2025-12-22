@@ -20,6 +20,7 @@ mod clip;
 mod database;
 mod search;
 mod server_arguments;
+pub mod metadata_provider;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DbImage {
