@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use image::{open, DynamicImage, ImageResult};
+use log::error;
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::{RecordId, Surreal};
@@ -13,11 +14,20 @@ pub struct BaseImage {
     pub path: String,
 }
 
-impl Into<BaseImageWithImage> for BaseImage{
-    fn into(self) -> BaseImageWithImage {
-        BaseImageWithImage{
-            base_image: self.clone(),
-            image: open(&self.path).expect("Failed to open image"),
+impl TryInto<BaseImageWithImage> for BaseImage{
+
+    type Error = ();
+
+    fn try_into(self) -> Result<BaseImageWithImage, Self::Error> {
+        let image_loading_result = open(&self.path);
+        if image_loading_result.is_ok() {
+            Ok(BaseImageWithImage{
+                base_image: self.clone(),
+                image: image_loading_result.unwrap(),
+            })
+        } else {
+            error!("Failed to load base image: {}", self.path);
+            Err(())
         }
     }
 }

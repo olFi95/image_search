@@ -1,5 +1,6 @@
 use std::mem::take;
 use std::path::PathBuf;
+use log::trace;
 use rayon::iter::IntoParallelRefIterator;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
@@ -24,12 +25,30 @@ impl MetadataIndexer {
             .par_iter()
             .map(PathBuf::from)
             .collect();
-
-        for image_paths in all_image_paths.chunks(50) {
+        let chunk_size = 100;
+        for image_paths in all_image_paths.chunks(chunk_size) {
+            // Convert Path Strings into PathBufs and then into BaseImages
+            trace!("converting {chunk_size} paths to base_images");
             let mut base_images: Vec<BaseImage> = image_paths.par_iter().map(|path| BaseImage::new(PathBuf::from(path))).collect();
+            trace!("Loading inserting {} base_images", &base_images.len());
+
+            // Save BaseImages to the repository
             base_images = base_image_repository.insert_many(base_images).await.expect("Inserting base image failed");
-            let base_images_with_image: Vec<_> = base_images.par_iter().cloned().map(|bi| bi.into()).collect();
+
+            // Now actually load the images. Only continue if the image could be loaded.
+            trace!("loading images into {} base_images", &base_images.len());
+            let base_images_with_image: Vec<_> = base_images.par_iter().cloned()
+                .map(|bi| bi.try_into())
+                .filter(|biwi| biwi.is_ok())
+                .map(|biwi| biwi.unwrap())
+                .collect();
+
+            // Calculate hashes of the image data.
+            trace!("calculating hashes for {} base_images", &base_images_with_image.len());
             let hashes = image_hash_metadata_provider.extract(&base_images_with_image).expect("cannot extract hashes");
+
+            // Save hashes to the repository
+            trace!("saving {} hashes", &hashes.len());
             image_hash_metadata_repository.insert_many(hashes).await.expect("could not save hashes");
         }
 
