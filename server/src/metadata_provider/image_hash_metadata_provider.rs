@@ -1,3 +1,4 @@
+use log::error;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
@@ -69,7 +70,7 @@ impl ImageHashMetadataRepository {
 
     pub async fn insert_many(
         &self,
-        items: Vec<Metadata<ImageHashMetadata>>,
+        items: &Vec<Metadata<ImageHashMetadata>>,
     ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
 
         if items.is_empty() {
@@ -81,14 +82,25 @@ impl ImageHashMetadataRepository {
         for item in items {
             let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
 
+            let metadata = match item.metadata.clone(){
+                Some(metadata) => metadata,
+                None => {
+                    error!("ImageHashMetadata is missing for ID {:?}", item.id);
+                    continue;
+                }
+            };
+
             let mut response = self.db
                 .query(format!(r#"
                 UPSERT {IMAGE_HASH_REPOSITORY_NAME}
-                SET base = $base, metadata = $metadata
+                SET base = $base,
+                    hash = $hash,
+                    hash_type = $hash_type
                 WHERE base = $base;
                 "#))
                 .bind(("base", base_id.clone()))
-                .bind(("metadata", item.metadata.clone()))
+                .bind(("hash", metadata.hash))
+                .bind(("hash_type", metadata.hash_type))
                 .await?;
 
             // SurrealDB liefert die erstellten oder vorhandenen Datensätze zurück

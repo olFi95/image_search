@@ -93,7 +93,7 @@ impl BasicMetadataRepository {
 
     pub async fn insert_many(
         &self,
-        items: Vec<Metadata<BasicMetadata>>,
+        items: &Vec<Metadata<BasicMetadata>>,
     ) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
 
         if items.is_empty() {
@@ -105,14 +105,30 @@ impl BasicMetadataRepository {
         for item in items {
             let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
 
+            let metadata = match item.metadata.clone(){
+                Some(metadata) => metadata,
+                None => {
+                    error!("BasicMetadata is missing for ID {:?}", item.id);
+                    continue;
+                }
+            };
             let mut response = self.db
                 .query(format!(r#"
                 UPSERT {BASIC_METADATA_REPOSITORY_NAME}
-                SET base = $base, metadata = $metadata
+                SET base = $base,
+                    file_extension = $file_extension,
+                    height = $height,
+                    width = $width,
+                    size_in_bytes = $size_in_bytes,
+                    created = $created
                 WHERE base = $base;
                 "#))
                 .bind(("base", base_id.clone()))
-                .bind(("metadata", item.metadata.clone()))
+                .bind(("file_extension", metadata.file_extension))
+                .bind(("height", metadata.height))
+                .bind(("width", metadata.width))
+                .bind(("size_in_bytes", metadata.size_in_bytes))
+                .bind(("created", metadata.created))
                 .await?;
 
             if let Ok(mut rows) = response.take::<Vec<Metadata<BasicMetadata>>>(0) {

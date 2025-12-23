@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::mpsc::channel;
 use crate::clip::{clip, embed_all_images_in_dir, embed_faces};
 use crate::{AppState, DbImage};
@@ -5,6 +6,8 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{debug_handler, response::IntoResponse};
+use burn::tensor::Device;
+use burn_wgpu::WgpuDevice;
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
@@ -104,38 +107,39 @@ pub async fn web_search_text(
     Ok(Json(SearchResponse { images }))
 }
 
-#[debug_handler]
-pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse {
-    let state_cloned = state.clone();
+#[axum::debug_handler]
+pub async fn indexing(
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let state = state.clone();
 
-    let metadata_indexer = MetadataIndexer::new(state_cloned.db.lock().await.clone());
-    metadata_indexer.index_metadata(state_cloned.arguments.shellexpand_media_dir().unwrap()).await.unwrap();
+    tokio::task::spawn_blocking(move || {
+        // ❗ alles Nicht-Send hier rein
+        let rt = tokio::runtime::Handle::current();
 
+        rt.block_on(async {
+            let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
 
-    // // embed_faces ist !Send → spawn_blocking benutzen
-    // let face_result = tokio::task::spawn_blocking(move || {
-    //     // block_on, um async embed_faces zu warten
-    //     tokio::runtime::Handle::current().block_on(embed_faces(&state_cloned))
-    // })
-    //     .await
-    //     .unwrap_or_else(|e| Err(Box::<dyn std::error::Error + Send + Sync>::from(e)));
-    //
-    // match face_result {
-    //     Ok(_) => info!("embedded all faces successfully."),
-    //     Err(e) => error!("Error embedding faces: {}", e),
-    // }
-    //
-    // // embed_all_images_in_dir ist Send → kann normal awaited werden
-    // // let state_cloned = state.clone();
-    // // let image_result = embed_all_images_in_dir(&state_cloned).await;
-    // // match image_result {
-    // //     Ok(_) => info!("embedded all images successfully."),
-    // //     Err(e) => error!("Error embedding images: {}", e),
-    // // }
+            let metadata_indexer = MetadataIndexer::new(
+                state.db.lock().await.clone(),
+                device,
+                state.arguments.arcface_model_weights.clone(),
+                state.arguments.yolo_model_weights.clone(),
+            );
 
-    StatusCode::OK
+            metadata_indexer
+                .index_metadata(
+                    state.arguments
+                        .shellexpand_media_dir()
+                        .expect("media dir"),
+                )
+                .await
+                .expect("indexing failed");
+        });
+    });
+
+    StatusCode::ACCEPTED
 }
-
 fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
     assert!(!vectors.is_empty(), "Input must not be empty");
 

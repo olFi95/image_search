@@ -1,18 +1,18 @@
-use std::sync::Arc;
+use crate::yolo;
 use burn::backend::Wgpu;
 use burn::prelude::{Device, TensorData};
 use burn::Tensor;
 use image::DynamicImage;
-use crate::yolo;
+use std::sync::Arc;
 
 pub struct FaceDetector{
-    pub model: Arc<yolo::Model<Wgpu>>,
-    pub device: Arc<Device<Wgpu>>,
+    pub model: Arc<Box<yolo::Model<Wgpu>>>,
+    pub device: Arc<Box<Device<Wgpu>>>,
 }
 
 impl FaceDetector {
-    pub fn new(model_path: &str, device: Arc<Device<Wgpu>>) -> Self {
-        let model = yolo::Model::from_file(model_path, device.as_ref());
+    pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
+        let model = Box::new(yolo::Model::from_file(model_path, device.as_ref().as_ref()));
         FaceDetector {
             model: Arc::new(model),
             device,
@@ -187,19 +187,20 @@ pub struct BBox {
 
 #[cfg(test)]
 mod tests {
+    use crate::face_detector::FaceDetector;
     use crate::yolo;
     use burn::backend::wgpu::WgpuDevice;
     use burn::backend::Wgpu;
     use image::open;
-    use crate::face_detector::FaceDetector;
+    use std::sync::Arc;
 
     #[test]
     pub fn test_find_faces_group_photo() {
         let device = WgpuDevice::DefaultDevice;
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
         let face_detector = FaceDetector {
-            model: alloc::sync::Arc::new(model),
-            device: alloc::sync::Arc::new(device),
+            model: Arc::new(Box::new(model)),
+            device: Arc::new(Box::new(device)),
         };
 
         let image = open("test/pexels-fauxels-3184398.jpg").expect("Failed to open image");
@@ -213,8 +214,8 @@ mod tests {
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
 
         let face_detector = FaceDetector {
-            model: alloc::sync::Arc::new(model),
-            device: alloc::sync::Arc::new(device),
+            model: Arc::new(Box::new(model)),
+            device: Arc::new(Box::new(device)),
         };
 
         let image = open("test/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg").expect("Failed to open image");
@@ -227,8 +228,8 @@ mod tests {
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
 
         let face_detector = FaceDetector {
-            model: alloc::sync::Arc::new(model),
-            device: alloc::sync::Arc::new(device),
+            model: Arc::new(Box::new(model)),
+            device: Arc::new(Box::new(device)),
         };
 
         let image = open("test/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg").expect("Failed to open image");

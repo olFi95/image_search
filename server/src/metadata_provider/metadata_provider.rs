@@ -48,7 +48,7 @@ impl BaseImage {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Metadata<M> {
-    pub id: Option<String>,
+    pub id: Option<RecordId>,
     pub metadata: Option<M>,
     pub base: Option<RecordId>,
 }

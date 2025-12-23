@@ -50,7 +50,7 @@ pub async fn embed_faces(
     state: &AppState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let db: Surreal<Client> = init_database(&state.arguments).await?;
-    let device = Arc::new(WgpuDevice::DefaultDevice);
+    let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
     let media_dir = state.arguments.shellexpand_media_dir()?;
 
     let face_detector = FaceDetector::new(&state.arguments.yolo_model_weights, device.clone());
