@@ -40,9 +40,10 @@ impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetada
             .collect();
 
         Ok(results)
-    }}
+    }
+}
 
-
+static IMAGE_HASH_REPOSITORY_NAME: &str = "image_hash_metadata";
 pub struct ImageHashMetadataRepository{
     db: Surreal<Client>,
 }
@@ -54,13 +55,12 @@ impl ImageHashMetadataRepository {
     async fn prepare_repository(
         db: &Surreal<Client>,
     ) -> anyhow::Result<()> {
-        db.query(
-            r#"
-            DEFINE INDEX IF NOT EXISTS image_hash_unique_base
-            ON image_hash_metadata
+        db.query(format!(r#"
+            DEFINE INDEX IF NOT EXISTS {IMAGE_HASH_REPOSITORY_NAME}_base_unique
+            ON {IMAGE_HASH_REPOSITORY_NAME}
             FIELDS base
             UNIQUE;
-            "#,
+            "#),
         )
             .await?;
 
@@ -82,13 +82,11 @@ impl ImageHashMetadataRepository {
             let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
 
             let mut response = self.db
-                .query(
-                    r#"
-                UPSERT image_hash_metadata
+                .query(format!(r#"
+                UPSERT {IMAGE_HASH_REPOSITORY_NAME}
                 SET base = $base, metadata = $metadata
                 WHERE base = $base;
-                "#
-                )
+                "#))
                 .bind(("base", base_id.clone()))
                 .bind(("metadata", item.metadata.clone()))
                 .await?;
@@ -112,11 +110,9 @@ impl ImageHashMetadataRepository {
         }
 
         let mut response = self.db
-            .query(
-                "SELECT *
-             FROM image_hash_metadata
-             WHERE base IN $base_ids"
-            )
+            .query(format!("SELECT *
+             FROM {IMAGE_HASH_REPOSITORY_NAME}
+             WHERE base IN $base_ids"))
             .bind(("base_ids", base_ids))
             .await?;
 
