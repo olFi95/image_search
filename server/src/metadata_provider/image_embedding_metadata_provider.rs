@@ -1,12 +1,8 @@
-use log::error;
+use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
+use clip::ImageEmbedder;
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
-use clip::ImageEmbedder;
-use face_detection::face_detector::FaceDetector;
-use face_detection::face_embedder::FaceEmbedder;
-use crate::metadata_provider::face_recognition_metadata_provider::{FaceInPicture, FaceInPictureVector, FaceRecognitionMetadataProvider};
-use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
 
 pub struct ImageEmbeddingMetadataProvider{
     image_embedder: ImageEmbedder,
@@ -69,10 +65,10 @@ impl ImageEmbeddingMetadataRepository {
         ).await?;
         Ok(())
     }
-    async fn rebuild_index(
-        db: &Surreal<Client>,
+    pub async fn rebuild_index(
+        &self,
     ) -> anyhow::Result<()> {
-        db.query(format!(r#"
+        self.db.query(format!(r#"
             REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}_mtree
             ON {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME};
             "#),

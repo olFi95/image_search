@@ -50,7 +50,7 @@ impl MetadataIndexer {
             .par_iter()
             .map(PathBuf::from)
             .collect();
-        let chunk_size = 2;
+        let chunk_size = 25;
         for image_paths in all_image_paths.chunks(chunk_size) {
             // Convert Path Strings into PathBufs and then into BaseImages
             trace!("converting {chunk_size} paths to base_images");
@@ -104,7 +104,9 @@ impl MetadataIndexer {
             image_embedding_metadata_repository.insert_many_image_embeddings(&image_embeddings).await.expect("cannot save image embeddings");
 
         }
-        info!("Finished indexing metadata for images in {}", path.to_str().unwrap_or("provided path"));
+        info!("Finished indexing metadata for images in {}. Rebuilding indexes now.", path.to_str().unwrap_or("provided path"));
+        image_embedding_metadata_repository.rebuild_index().await.expect("cannot rebuild image embedding metadata index");
+        info!("Finished rebuilding indexes of metadata in {}.", path.to_str().unwrap_or("provided path"));
         Ok(())
     }
 }
