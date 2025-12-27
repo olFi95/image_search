@@ -125,6 +125,7 @@ pub async fn indexing(
                 device,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
+                state.arguments.clip_model_weights.clone(),
             );
 
             metadata_indexer

@@ -1898,6 +1898,7 @@ dependencies = [
  "burn-import",
  "burn-store",
  "hf-hub",
+ "image",
  "onnx_updater",
  "which 8.0.0",
 ]

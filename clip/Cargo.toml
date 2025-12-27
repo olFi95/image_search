@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 burn = { version = "0.20.0-pre.6", features = ["wgpu", "vulkan", "webgpu"] }
 burn-store = "0.20.0-pre.6"
+image = "0.25.9"
 
 [build-dependencies]
 burn-import = { version = "0.20.0-pre.6", features = ["onnx", "safetensors", "pytorch", "default"] }
