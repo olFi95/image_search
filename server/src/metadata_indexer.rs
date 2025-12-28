@@ -12,8 +12,10 @@ use crate::clip::get_all_directories_in_dir;
 use crate::metadata_provider::image_hash_metadata_provider::{ImageHashMetadataProvider, ImageHashMetadataRepository};
 use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository, MetadataProvider};
 use rayon::iter::ParallelIterator;
+use face_detection::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
 use face_detection::face_detector::FaceDetector;
 use face_detection::face_embedder::FaceEmbedder;
+use crate::metadata_provider::age_and_gender_metadata_provider::{AgeAndGenderMetadataProvider, FaceAgeAndGenderMetadataRepository};
 use crate::metadata_provider::basic_metadata_provider::{BasicMetadataProvider, BasicMetadataRepository};
 use crate::metadata_provider::face_recognition_metadata_provider::{FaceRecognitionMetadataProvider, FaceRecognitionMetadataRepository};
 use crate::metadata_provider::image_embedding_metadata_provider::{ImageEmbeddingMetadataProvider, ImageEmbeddingMetadataRepository};
@@ -23,12 +25,13 @@ pub struct MetadataIndexer {
     device: Arc<Box<Device<Wgpu>>>,
     face_detector: String,
     face_embedder: String,
+    face_age_and_gender: String,
     image_embedder: String,
 }
 
 impl MetadataIndexer {
-    pub fn new(db: Surreal<Client>, device: Arc<Box<Device<Wgpu>>>, face_embedder: String, face_detector: String, image_embedder: String) -> Self {
-        MetadataIndexer { db, device, face_embedder, face_detector, image_embedder }
+    pub fn new(db: Surreal<Client>, device: Arc<Box<Device<Wgpu>>>, face_embedder: String, face_detector: String, image_embedder: String, face_age_and_gender: String) -> Self {
+        MetadataIndexer { db, device, face_embedder, face_detector, image_embedder, face_age_and_gender}
     }
 
     pub async fn index_metadata(&self, path: PathBuf) -> anyhow::Result<()> {
@@ -38,11 +41,13 @@ impl MetadataIndexer {
         let face_recognition_metadata_provider = FaceRecognitionMetadataProvider::new(
             self.device.clone(), self.face_detector.as_str(), self.face_embedder.as_str()
         );
+        let face_age_and_gender_metadata_provider = AgeAndGenderMetadataProvider::new(self.device.clone(), self.face_age_and_gender.as_str());
         let image_embedding_metadata_provider = ImageEmbeddingMetadataProvider::new(self.device.clone(), self.image_embedder.as_str());
         // Metadata Repositories
         let image_hash_metadata_repository = ImageHashMetadataRepository::new(self.db.clone()).await;
         let basic_metadata_repository = BasicMetadataRepository::new(self.db.clone()).await;
         let face_recognition_metadata_repository = FaceRecognitionMetadataRepository::new(self.db.clone()).await;
+        let face_age_and_gender_metadata_repository = FaceAgeAndGenderMetadataRepository::new(self.db.clone()).await;
         let image_embedding_metadata_repository = ImageEmbeddingMetadataRepository::new(self.db.clone()).await;
 
         let base_image_repository = BaseImageRepository::new(self.db.clone()).await;
@@ -90,6 +95,12 @@ impl MetadataIndexer {
             // Save face recognition metadata to the repository.
             trace!("saving {} face recognition metadata entries", &faces.len());
             let faces = face_recognition_metadata_repository.insert_many_face_in_picture(&faces).await.expect("cannot save discovered faces to database.");
+
+            // Run Age and Gender estimation on discovered faces.
+            trace!("running age and gender estimation on {} faces", &faces.len());
+            let res = face_age_and_gender_metadata_provider.extract(&faces).expect("cannot extract age and gender");
+            trace!("saving age and gender of {} faces.", &res.len());
+            face_age_and_gender_metadata_repository.insert_many_age_and_gender(&res).await.expect("could not save age and gender metadata");
 
             // Embed discovered faces.
             trace!("embedding {} faces that were found in the images.", &faces.len());

@@ -9,6 +9,8 @@ pub struct ServerArguments {
     pub clip_model_weights: String,
     #[clap(long = "arcface-model-weights", default_value = "./models/arcface_model.bpk")]
     pub arcface_model_weights: String,
+    #[clap(long = "age-and-gender-model-weights", default_value = "./models/age_gender.bpk")]
+    pub age_and_gender_model_weights: String,
     #[clap(long = "yolo-model-weights", default_value = "./models/yolo.bpk")]
     pub yolo_model_weights: String,
     #[clap(short = 'm', long = "media-dir", default_value = "~/Pictures")]

@@ -126,6 +126,7 @@ pub async fn indexing(
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
                 state.arguments.clip_model_weights.clone(),
+                state.arguments.age_and_gender_model_weights.clone(),
             );
 
             metadata_indexer

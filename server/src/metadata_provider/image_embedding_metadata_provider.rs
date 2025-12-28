@@ -13,7 +13,8 @@ impl ImageEmbeddingMetadataProvider {
         Self {
             image_embedder: ImageEmbedder::new(image_embedder, device),
         }
-    }}
+    }
+}
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
