@@ -48,8 +48,14 @@ pub async fn web_search_text(
 
         let mut marked_image_embeddings_response = db
             .query(
-                "
-        SELECT id, image_path, embedding FROM image WHERE image_path IN $image_paths",
+                r#"
+                    SELECT
+                        id,
+                        path AS image_path,
+                        ->has_image_embedding_vector->image_embedding_vector.embedding[0] AS embedding
+                    FROM base_image
+                    WHERE path IN $image_paths
+                "#,
             )
             .bind(("image_paths", image_paths))
             .await
@@ -74,12 +80,20 @@ pub async fn web_search_text(
     }
 
     let query = r#"
+        LET $similar_vectors = (
+            SELECT
+                id,
+                vector::distance::knn() AS similarity
+            FROM image_embedding_vector
+            WHERE embedding <|500|> $reference
+            ORDER BY similarity
+        );
+
         SELECT
-            id,
-            image_path,
-            vector::distance::knn() AS similarity
-        FROM image
-        WHERE embedding <| 1000 |> $reference;
+            similarity,
+            <-has_image_embedding_vector<-base_image[0].id[0] AS id,
+            <-has_image_embedding_vector<-base_image[0].path[0] AS image_path
+        FROM $similar_vectors;
     "#;
 
     let mut response = db
@@ -91,7 +105,7 @@ pub async fn web_search_text(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let db_images: Vec<DbImage> = response.take(0).map_err(|err| {
+    let db_images: Vec<DbImage> = response.take(1).map_err(|err| {
         tracing::error!("Failed to deserialize response: {:?}", err);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
