@@ -43,7 +43,6 @@ docker run --rm -p 3000:3000 \                                                  
 For podman we need to build and run the image as root to get access to the GPU devices.
 ```shell
 sudo podman build -t localhost/embedder-server .
-
 ```
 
 # Run requirements
@@ -51,21 +50,35 @@ sudo podman build -t localhost/embedder-server .
 - set the `model-weights` parameter where the model-weights are stored. They get exported on build to `models/vision_model.mpk`
 
 # Query Surrealdb
-To query surrealdb for images with all their related metadata use this example:
+To query surrealdb for similar images with all their related metadata use this example:
 ```sql
-SELECT *,
+LET $reference = (
+    SELECT VALUE embedding
+    FROM image_embedding_vector
+    LIMIT 1
+)[0];
+
+LET $similar_vectors = (
+    SELECT
+        id,
+        vector::distance::knn() AS similarity
+    FROM image_embedding_vector
+    WHERE embedding <|10|> $reference
+ORDER BY similarity
+);
+
+SELECT
     (
         SELECT
             *,
-            ->has_face_in_picture_vector->face_in_picture_vector.* AS vectors,
-            ->has_face_age_and_gender_estimation->face_age_and_gender_estimation.* AS age_and_gender
-        FROM ->has_face_in_picture->face_in_picture
-        ORDER BY top_left_x
+        <-has_image_embedding_vector<-base_image->has_face_in_picture_vector->face_in_picture_vector.* AS vectors,
+        <-has_image_embedding_vector<-base_image->has_face_age_and_gender_estimation->face_age_and_gender_estimation.* AS age_and_gender
+FROM <-has_image_embedding_vector<-base_image->has_face_in_picture->face_in_picture
+ORDER BY top_left_x
     ) AS faces,
-    ->has_basic_metadata->basic_metadata.* AS basic_metadata,
-    ->has_image_embedding_vector->image_embedding_vector.* AS image_embedding,
-    ->has_image_hash_metadata->image_hash_metadata.* AS image_hash
-FROM base_image
-LIMIT 50;
-
+        <-has_image_embedding_vector<-base_image.* AS base_image,
+        <-has_image_embedding_vector<-base_image->has_basic_metadata->basic_metadata.* AS basic_metadata,
+        <-has_image_embedding_vector<-base_image->has_image_embedding_vector->image_embedding_vector.* AS image_embedding,
+        <-has_image_embedding_vector<-base_image->has_image_hash_metadata->image_hash_metadata.* AS image_hash
+FROM $similar_vectors;
 ```
