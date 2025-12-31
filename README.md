@@ -49,3 +49,23 @@ sudo podman build -t localhost/embedder-server .
 # Run requirements
 - running surrealdb instance. For testing one can use `docker run --rm --pull always --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass root memory`.
 - set the `model-weights` parameter where the model-weights are stored. They get exported on build to `models/vision_model.mpk`
+
+# Query Surrealdb
+To query surrealdb for images with all their related metadata use this example:
+```sql
+SELECT *,
+    (
+        SELECT
+            *,
+            ->has_face_in_picture_vector->face_in_picture_vector.* AS vectors,
+            ->has_face_age_and_gender_estimation->face_age_and_gender_estimation.* AS age_and_gender
+        FROM ->has_face_in_picture->face_in_picture
+        ORDER BY top_left_x
+    ) AS faces,
+    ->has_basic_metadata->basic_metadata.* AS basic_metadata,
+    ->has_image_embedding_vector->image_embedding_vector.* AS image_embedding,
+    ->has_image_hash_metadata->image_hash_metadata.* AS image_hash
+FROM base_image
+LIMIT 50;
+
+```

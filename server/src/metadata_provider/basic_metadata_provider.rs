@@ -65,7 +65,8 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
     }
 }
 
-static BASIC_METADATA_REPOSITORY_NAME: &str = "basic_metadata";
+static BASIC_METADATA_DATA_NAME: &str = "basic_metadata";
+static BASIC_METADATA_RELATION_NAME: &str = "has_basic_metadata";
 
 pub struct BasicMetadataRepository {
     db: Surreal<Client>,
@@ -80,8 +81,8 @@ impl BasicMetadataRepository {
         db: &Surreal<Client>,
     ) -> anyhow::Result<()> {
         db.query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {BASIC_METADATA_REPOSITORY_NAME}_base_unique
-            ON {BASIC_METADATA_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {BASIC_METADATA_DATA_NAME}_base_unique
+            ON {BASIC_METADATA_DATA_NAME}
             FIELDS base
             UNIQUE;
             "#),
@@ -114,14 +115,16 @@ impl BasicMetadataRepository {
             };
             let mut response = self.db
                 .query(format!(r#"
-                UPSERT {BASIC_METADATA_REPOSITORY_NAME}
-                SET base = $base,
-                    file_extension = $file_extension,
-                    height = $height,
-                    width = $width,
-                    size_in_bytes = $size_in_bytes,
-                    created = $created
-                WHERE base = $base;
+                LET $tmp = (
+                    UPSERT {BASIC_METADATA_DATA_NAME}
+                    SET file_extension = $file_extension,
+                        height = $height,
+                        width = $width,
+                        size_in_bytes = $size_in_bytes,
+                        created = $created
+                );
+                LET $id = $tmp[0].id;
+                RELATE $base -> {BASIC_METADATA_RELATION_NAME} -> $id;
                 "#))
                 .bind(("base", base_id.clone()))
                 .bind(("file_extension", metadata.file_extension))

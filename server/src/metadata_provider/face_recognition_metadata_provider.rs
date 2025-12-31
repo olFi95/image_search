@@ -44,8 +44,10 @@ pub struct FaceInPictureVector{
     pub vector: Vec<f32>,
 }
 
-static FACE_IN_PICTURE_REPOSITORY_NAME: &str = "face_in_picture";
-static FACE_IN_PICTURE_VECTOR_REPOSITORY_NAME: &str = "face_in_picture_vector";
+static FACE_IN_PICTURE_DATA_NAME: &str = "face_in_picture";
+static FACE_IN_PICTURE_RELATION_NAME: &str = "has_face_in_picture";
+static FACE_IN_PICTURE_VECTOR_DATA_NAME: &str = "face_in_picture_vector";
+static FACE_IN_PICTURE_VECTOR_RELATION_NAME: &str = "has_face_in_picture_vector";
 
 
 impl MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMetadataProvider {
@@ -129,19 +131,18 @@ impl FaceRecognitionMetadataRepository {
         db: &Surreal<Client>,
     ) -> anyhow::Result<()> {
         db.query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_REPOSITORY_NAME}_base_unique
-            ON {FACE_IN_PICTURE_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_unique
+            ON {FACE_IN_PICTURE_DATA_NAME}
             FIELDS base
             UNIQUE;
             "#),
         ).query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_REPOSITORY_NAME}_base_unique
-            ON {FACE_IN_PICTURE_VECTOR_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_base_unique
+            ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
             "#))
             .await?;
-
         Ok(())
     }
 
@@ -171,14 +172,22 @@ impl FaceRecognitionMetadataRepository {
 
             let mut response = self.db
                 .query(format!(r#"
-                UPSERT {FACE_IN_PICTURE_REPOSITORY_NAME}
-                SET base = $base,
-                    top_left_x = $top_left_x,
-                    top_left_y = $top_left_y,
-                    bottom_right_x = $bottom_right_x,
-                    bottom_right_y = $bottom_right_y,
-                    confidence = $confidence
-                WHERE base = $base;
+                LET $tmp = (
+                    UPSERT {FACE_IN_PICTURE_DATA_NAME}
+                    SET top_left_x = $top_left_x,
+                        top_left_y = $top_left_y,
+                        bottom_right_x = $bottom_right_x,
+                        bottom_right_y = $bottom_right_y,
+                        confidence = $confidence
+                    WHERE base = $base
+                );
+                "#))
+                .query(format!(r#"
+                LET $id = $tmp[0].id;
+                RELATE $base -> {FACE_IN_PICTURE_RELATION_NAME} -> $id;
+                "#))
+                .query(format!(r#"
+                $tmp[0];
                 "#))
                 .bind(("base", item.id.clone()))
                 .bind(("top_left_x", face_in_picture_metadata.top_left_x))
@@ -188,7 +197,7 @@ impl FaceRecognitionMetadataRepository {
                 .bind(("confidence", face_in_picture_metadata.confidence))
                 .await?;
 
-            if let Ok(mut rows) = response.take::<Vec<Metadata<FaceInPicture>>>(0) {
+            if let Ok(mut rows) = response.take::<Vec<Metadata<FaceInPicture>>>(3) {
                 rows[0].metadata = item.metadata.clone();
                 inserted.append(&mut rows);
             }
@@ -213,15 +222,20 @@ impl FaceRecognitionMetadataRepository {
 
             let mut response = self.db
                 .query(format!(r#"
-                UPSERT {FACE_IN_PICTURE_VECTOR_REPOSITORY_NAME}
-                SET base = $base, embedding = $embedding
-                WHERE base = $base;
+                LET $tmp = (
+                    UPSERT {FACE_IN_PICTURE_VECTOR_DATA_NAME}
+                    SET embedding = $embedding
+                    WHERE base = $base
+                );
+                LET $id = $tmp[0].id;
+                RELATE $base -> {FACE_IN_PICTURE_VECTOR_RELATION_NAME} -> $id;
+                $tmp[0];
                 "#))
                 .bind(("base", base_id.clone()))
                 .bind(("embedding", embedding))
                 .await?;
 
-            if let Ok(mut rows) = response.take::<Vec<Metadata<FaceInPictureVector>>>(0) {
+            if let Ok(mut rows) = response.take::<Vec<Metadata<FaceInPictureVector>>>(3) {
                 inserted.append(&mut rows);
             }
         }

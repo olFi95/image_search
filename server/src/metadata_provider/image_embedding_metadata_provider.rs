@@ -42,7 +42,8 @@ impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMeta
 pub struct ImageEmbeddingMetadataRepository {
     db: Surreal<Client>,
 }
-static IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME: &str = "image_embedding_vector";
+static IMAGE_EMBEDDING_VECTOR_DATA_NAME: &str = "image_embedding_vector";
+static IMAGE_EMBEDDING_VECTOR_RELATION_NAME: &str = "has_image_embedding_vector";
 
 impl ImageEmbeddingMetadataRepository {
     pub async fn new(db: Surreal<Client>) -> Self {
@@ -53,14 +54,14 @@ impl ImageEmbeddingMetadataRepository {
         db: &Surreal<Client>,
     ) -> anyhow::Result<()> {
         db.query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}_base_unique
-            ON {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_base_unique
+            ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
             "#),
         ).query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}_mtree
-            ON {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+            ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;
             "#),
         ).await?;
@@ -70,8 +71,8 @@ impl ImageEmbeddingMetadataRepository {
         &self,
     ) -> anyhow::Result<()> {
         self.db.query(format!(r#"
-            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}_mtree
-            ON {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME};
+            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+            ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME};
             "#),
         ).await?;
         Ok(())
@@ -93,9 +94,13 @@ impl ImageEmbeddingMetadataRepository {
 
             let mut response = self.db
                 .query(format!(r#"
-                UPSERT {IMAGE_EMBEDDING_VECTOR_REPOSITORY_NAME}
-                SET base = $base, embedding = $embedding
-                WHERE base = $base;
+                LET $tmp = (
+                    UPSERT {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
+                    SET embedding = $embedding
+                    WHERE base = $base
+                );
+                LET $id = $tmp[0].id;
+                RELATE $base -> {IMAGE_EMBEDDING_VECTOR_RELATION_NAME} -> $id
                 "#))
                 .bind(("base", base_id.clone()))
                 .bind(("embedding", embedding))

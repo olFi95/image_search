@@ -76,7 +76,8 @@ pub struct FaceAgeAndGenderMetadataRepository {
     db: Surreal<Client>,
 }
 
-static FACE_AGE_AND_GENDER_REPOSITORY_NAME: &str = "face_age_and_gender_estimation";
+static FACE_AGE_AND_GENDER_DATA_NAME: &str = "face_age_and_gender_estimation";
+static FACE_AGE_AND_GENDER_RELATION_NAME: &str = "has_face_age_and_gender_estimation";
 impl FaceAgeAndGenderMetadataRepository {
     pub async fn new(db: Surreal<Client>) -> Self {
         Self::prepare_repository(&db).await.expect("cannot prepare repository with indexes");
@@ -86,8 +87,8 @@ impl FaceAgeAndGenderMetadataRepository {
         db: &Surreal<Client>,
     ) -> anyhow::Result<()> {
         db.query(format!(r#"
-            DEFINE INDEX IF NOT EXISTS {FACE_AGE_AND_GENDER_REPOSITORY_NAME}_base_unique
-            ON {FACE_AGE_AND_GENDER_REPOSITORY_NAME}
+            DEFINE INDEX IF NOT EXISTS {FACE_AGE_AND_GENDER_DATA_NAME}_base_unique
+            ON {FACE_AGE_AND_GENDER_DATA_NAME}
             FIELDS base
             UNIQUE;
             "#),
@@ -111,11 +112,14 @@ impl FaceAgeAndGenderMetadataRepository {
 
             let mut response = self.db
                 .query(format!(r#"
-                UPSERT {FACE_AGE_AND_GENDER_REPOSITORY_NAME}
-                SET base = $base,
-                    age = $age,
-                    gender = $gender
-                WHERE base = $base;
+                LET $tmp = (
+                    UPSERT {FACE_AGE_AND_GENDER_DATA_NAME}
+                    SET age = $age,
+                        gender = $gender
+                    WHERE base = $base
+                );
+                LET $id = $tmp[0].id;
+                RELATE $base-> {FACE_AGE_AND_GENDER_RELATION_NAME} -> $id;
                 "#))
                 .bind(("base", base_id.clone()))
                 .bind(("age", age_and_gender.age))
