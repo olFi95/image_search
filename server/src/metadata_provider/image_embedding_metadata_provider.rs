@@ -1,38 +1,40 @@
 use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
 use clip::ImageEmbedder;
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
+use surrealdb::engine::remote::ws::Client;
 
-pub struct ImageEmbeddingMetadataProvider{
+pub struct ImageEmbeddingMetadataProvider {
     image_embedder: ImageEmbedder,
 }
 
 impl ImageEmbeddingMetadataProvider {
-    pub fn new(device: std::sync::Arc<Box<burn::tensor::Device<burn_wgpu::Wgpu>>>, image_embedder: &str) -> Self {
+    pub fn new(
+        device: std::sync::Arc<Box<burn::tensor::Device<burn_wgpu::Wgpu>>>,
+        image_embedder: &str,
+    ) -> Self {
         Self {
             image_embedder: ImageEmbedder::new(image_embedder, device),
         }
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ImageEmbedding{
+pub struct ImageEmbedding {
     pub vector: Vec<f32>,
 }
 
 impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider {
-    fn extract(&self, images: &Vec<BaseImageWithImage>) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
+    fn extract(
+        &self,
+        images: &Vec<BaseImageWithImage>,
+    ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
         let mut results: Vec<Metadata<ImageEmbedding>> = vec![];
         for image in images {
-            let embedding = self.image_embedder
-                .embed(&image.image);
-            results.push(Metadata{
+            let embedding = self.image_embedder.embed(&image.image);
+            results.push(Metadata {
                 id: None,
-                metadata: Some(ImageEmbedding {
-                    vector: embedding,
-                }),
+                metadata: Some(ImageEmbedding { vector: embedding }),
                 base: Some(image.base_image.id.clone().unwrap()),
             });
         }
@@ -47,41 +49,45 @@ static IMAGE_EMBEDDING_VECTOR_RELATION_NAME: &str = "has_image_embedding_vector"
 
 impl ImageEmbeddingMetadataRepository {
     pub async fn new(db: Surreal<Client>) -> Self {
-        Self::prepare_repository(&db).await.expect("cannot prepare repository with indexes");
+        Self::prepare_repository(&db)
+            .await
+            .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(
-        db: &Surreal<Client>,
-    ) -> anyhow::Result<()> {
-        db.query(format!(r#"
+    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+        db.query(format!(
+            r#"
             DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_base_unique
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
-            "#),
-        ).query(format!(r#"
+            "#
+        ))
+        .query(format!(
+            r#"
             DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;
-            "#),
-        ).await?;
+            "#
+        ))
+        .await?;
         Ok(())
     }
-    pub async fn rebuild_index(
-        &self,
-    ) -> anyhow::Result<()> {
-        self.db.query(format!(r#"
+    pub async fn rebuild_index(&self) -> anyhow::Result<()> {
+        self.db
+            .query(format!(
+                r#"
             REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME};
-            "#),
-        ).await?;
+            "#
+            ))
+            .await?;
         Ok(())
     }
     pub async fn insert_many_image_embeddings(
         &self,
         items: &Vec<Metadata<ImageEmbedding>>,
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
-
         if items.is_empty() {
             return Ok(Vec::new());
         }
@@ -89,11 +95,20 @@ impl ImageEmbeddingMetadataRepository {
         let mut inserted = Vec::new();
 
         for item in items {
-            let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
-            let embedding = item.metadata.clone().ok_or(anyhow::anyhow!("Metadata missing"))?.vector;
+            let base_id = item
+                .base
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
+            let embedding = item
+                .metadata
+                .clone()
+                .ok_or(anyhow::anyhow!("Metadata missing"))?
+                .vector;
 
-            let mut response = self.db
-                .query(format!(r#"
+            let mut response = self
+                .db
+                .query(format!(
+                    r#"
                 LET $tmp = (
                     UPSERT {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
                     SET embedding = $embedding
@@ -101,7 +116,8 @@ impl ImageEmbeddingMetadataRepository {
                 );
                 LET $id = $tmp[0].id;
                 RELATE $base -> {IMAGE_EMBEDDING_VECTOR_RELATION_NAME} -> $id
-                "#))
+                "#
+                ))
                 .bind(("base", base_id.clone()))
                 .bind(("embedding", embedding))
                 .await?;
@@ -113,5 +129,4 @@ impl ImageEmbeddingMetadataRepository {
 
         Ok(inserted)
     }
-
 }

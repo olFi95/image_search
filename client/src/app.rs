@@ -1,21 +1,21 @@
-use serde_wasm_bindgen::to_value;
-use crate::image_grid::ImageGrid;
 use crate::header::Header;
-use leptos::prelude::*;
-use leptos::ev::KeyboardEvent;
-use leptos::view;
-use leptos::component;
-use leptos::IntoView;
-use leptos::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use data::SearchResponse;
+use crate::image_grid::ImageGrid;
 use data::SearchParams;
+use data::SearchResponse;
 use gloo_net::http::Request;
+use leptos::IntoView;
+use leptos::component;
+use leptos::ev::KeyboardEvent;
 use leptos::logging::error;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use leptos::server_fn::codec::Json;
+use leptos::view;
 use serde_json::from_str;
 use serde_urlencoded::to_string;
+use serde_wasm_bindgen::to_value;
 use urlencoding::encode;
+use wasm_bindgen_futures::spawn_local;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -31,7 +31,12 @@ pub fn App() -> impl IntoView {
                 Ok(js_value) => {
                     let request = Request::post("/search")
                         .header("Content-Type", "application/json")
-                        .body(js_sys::JSON::stringify(&js_value).unwrap().as_string().unwrap())
+                        .body(
+                            js_sys::JSON::stringify(&js_value)
+                                .unwrap()
+                                .as_string()
+                                .unwrap(),
+                        )
                         .unwrap();
 
                     if let Ok(response) = request.send().await {
@@ -55,14 +60,11 @@ pub fn App() -> impl IntoView {
         });
     };
 
-
     let perform_scan = move || {
         spawn_local(async move {
             let url = format!("/scan");
             match Request::get(&url).send().await {
-                Ok(response) => {
-                    
-                }
+                Ok(response) => {}
                 Err(e) => log::error!("Fehler beim Abrufen: {:?}", e),
             }
         });

@@ -1,15 +1,24 @@
+use clap::Parser;
 use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use clap::Parser;
 
 #[derive(Parser, Debug, Clone)]
 pub struct ServerArguments {
-    #[clap(long = "clip-model-weights", default_value = "./models/vision_model.bpk")]
+    #[clap(
+        long = "clip-model-weights",
+        default_value = "./models/vision_model.bpk"
+    )]
     pub clip_model_weights: String,
-    #[clap(long = "arcface-model-weights", default_value = "./models/arcface_model.bpk")]
+    #[clap(
+        long = "arcface-model-weights",
+        default_value = "./models/arcface_model.bpk"
+    )]
     pub arcface_model_weights: String,
-    #[clap(long = "age-and-gender-model-weights", default_value = "./models/age_gender.bpk")]
+    #[clap(
+        long = "age-and-gender-model-weights",
+        default_value = "./models/age_gender.bpk"
+    )]
     pub age_and_gender_model_weights: String,
     #[clap(long = "yolo-model-weights", default_value = "./models/yolo.bpk")]
     pub yolo_model_weights: String,

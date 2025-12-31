@@ -1,11 +1,11 @@
 extern crate alloc;
 
-use std::sync::Arc;
+use burn::Tensor;
 use burn::backend::Wgpu;
 use burn::prelude::Device;
-use burn::Tensor;
 use burn::tensor::TensorData;
 use image::DynamicImage;
+use std::sync::Arc;
 
 pub mod clip_vit_large_patch14 {
     include!(concat!(
@@ -14,13 +14,16 @@ pub mod clip_vit_large_patch14 {
     ));
 }
 
-pub struct ImageEmbedder{
+pub struct ImageEmbedder {
     pub model: Arc<Box<clip_vit_large_patch14::Model<Wgpu>>>,
     pub device: Arc<Box<Device<Wgpu>>>,
 }
-impl ImageEmbedder{
+impl ImageEmbedder {
     pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
-        let model = Box::new(clip_vit_large_patch14::Model::from_file(model_path, device.as_ref().as_ref()));
+        let model = Box::new(clip_vit_large_patch14::Model::from_file(
+            model_path,
+            device.as_ref().as_ref(),
+        ));
         ImageEmbedder {
             model: Arc::new(model),
             device,
@@ -54,13 +57,8 @@ impl ImageEmbedder{
             data[224 * 224 + i] = (g - mean[1]) / std[1]; // Green channel
             data[2 * 224 * 224 + i] = (b - mean[2]) / std[2]; // Blue channel
         }
-        let image_data = TensorData::new(
-            data,
-            [1, 3, 224, 224],
-        );
+        let image_data = TensorData::new(data, [1, 3, 224, 224]);
 
         image_data.into()
     }
-
-
 }

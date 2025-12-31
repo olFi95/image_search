@@ -1,11 +1,9 @@
-use crate::{age_gender, arcface};
+use crate::age_gender;
 use burn::backend::Wgpu;
 use burn::prelude::{Device, TensorData};
-use std::sync::Arc;
-use burn::backend::wgpu::WgpuDevice;
 use burn::Tensor;
 use image::DynamicImage;
-use crate::face_embedder::FaceEmbedder;
+use std::sync::Arc;
 
 pub struct FaceAgeAndGenderEstimator {
     pub model: Arc<Box<age_gender::Model<Wgpu>>>,
@@ -13,7 +11,10 @@ pub struct FaceAgeAndGenderEstimator {
 }
 impl FaceAgeAndGenderEstimator {
     pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
-        let model = Box::new(age_gender::Model::from_file(model_path, device.as_ref().as_ref()));
+        let model = Box::new(age_gender::Model::from_file(
+            model_path,
+            device.as_ref().as_ref(),
+        ));
         Self {
             model: Arc::new(model),
             device,
@@ -47,10 +48,7 @@ impl FaceAgeAndGenderEstimator {
             data[224 * 224 + i] = (g - mean[1]) / std[1]; // Green channel
             data[2 * 224 * 224 + i] = (b - mean[2]) / std[2]; // Blue channel
         }
-        let image_data = TensorData::new(
-            data,
-            [1, 3, 224, 224],
-        );
+        let image_data = TensorData::new(data, [1, 3, 224, 224]);
 
         image_data.into()
     }

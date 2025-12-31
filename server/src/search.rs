@@ -1,20 +1,16 @@
-use std::sync::Arc;
-use std::sync::mpsc::channel;
-use crate::clip::{clip, embed_all_images_in_dir, embed_faces};
+use crate::clip::clip;
+use crate::metadata_indexer::MetadataIndexer;
 use crate::{AppState, DbImage};
-use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{debug_handler, response::IntoResponse};
-use burn::tensor::Device;
+use axum::Json;
+use axum::response::IntoResponse;
 use burn_wgpu::WgpuDevice;
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use surrealdb::RecordId;
-use tokio::join;
-use tokio::runtime::Handle;
-use crate::metadata_indexer::MetadataIndexer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -34,8 +30,14 @@ pub async fn web_search_text(
     let mut query_vector = embedding.clone();
 
     info!("image_paths: {:?}", params.referenced_images);
-    let media_dir = state.arguments.shellexpand_media_dir().expect("media dir could not be loaded");
-    let media_dir_str = media_dir.into_os_string().into_string().expect("media dir could not be converted to string");
+    let media_dir = state
+        .arguments
+        .shellexpand_media_dir()
+        .expect("media dir could not be loaded");
+    let media_dir_str = media_dir
+        .into_os_string()
+        .into_string()
+        .expect("media dir could not be converted to string");
 
     if !params.referenced_images.is_empty() {
         let image_paths: Vec<String> = params
@@ -122,9 +124,7 @@ pub async fn web_search_text(
 }
 
 #[axum::debug_handler]
-pub async fn indexing(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse {
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -144,11 +144,7 @@ pub async fn indexing(
             );
 
             metadata_indexer
-                .index_metadata(
-                    state.arguments
-                        .shellexpand_media_dir()
-                        .expect("media dir"),
-                )
+                .index_metadata(state.arguments.shellexpand_media_dir().expect("media dir"))
                 .await
                 .expect("indexing failed");
         });

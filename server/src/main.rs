@@ -4,7 +4,7 @@ use crate::database::init_database;
 use crate::search::{indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use clap::Parser;
 use embed_anything::embeddings::embed::Embedder;
 use env_logger::Env;
@@ -18,10 +18,10 @@ use tower_http::services::{ServeDir, ServeFile};
 
 mod clip;
 mod database;
+pub mod metadata_indexer;
+pub mod metadata_provider;
 mod search;
 mod server_arguments;
-pub mod metadata_provider;
-pub mod metadata_indexer;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DbImage {

@@ -1,11 +1,11 @@
 use crate::yolo;
+use burn::Tensor;
 use burn::backend::Wgpu;
 use burn::prelude::{Device, TensorData};
-use burn::Tensor;
 use image::DynamicImage;
 use std::sync::Arc;
 
-pub struct FaceDetector{
+pub struct FaceDetector {
     pub model: Arc<Box<yolo::Model<Wgpu>>>,
     pub device: Arc<Box<Device<Wgpu>>>,
 }
@@ -21,18 +21,13 @@ impl FaceDetector {
 
     /// Detect all faces in an image. returns a vector of cropped face images.
     pub fn detect(&self, img: &DynamicImage) -> Vec<DetectedFace> {
-
         let scaled_image = scale_image::<640, 640>(img.clone());
-        let input =
-            image_to_tensor(&scaled_image.scaled_image, &self.device);
+        let input = image_to_tensor(&scaled_image.scaled_image, &self.device);
 
         let output = self.model.forward(input);
 
-        let data = output
-            .to_data();
-        let data_slice =
-            data.as_slice::<f32>()
-                .expect("Tensor is not f32");
+        let data = output.to_data();
+        let data_slice = data.as_slice::<f32>().expect("Tensor is not f32");
 
         let num_attrs = 5;
         let num_anchors = 8400;
@@ -45,15 +40,13 @@ impl FaceDetector {
         let conf_threshold = 0.5;
 
         for anchor in 0..num_anchors {
-
             let offset = base * stride_batch + anchor;
 
-            let x    = data_slice[offset + 0 * stride_attr];
-            let y    = data_slice[offset + 1 * stride_attr];
-            let w    = data_slice[offset + 2 * stride_attr];
-            let h    = data_slice[offset + 3 * stride_attr];
+            let x = data_slice[offset + 0 * stride_attr];
+            let y = data_slice[offset + 1 * stride_attr];
+            let w = data_slice[offset + 2 * stride_attr];
+            let h = data_slice[offset + 3 * stride_attr];
             let conf = data_slice[offset + 4 * stride_attr];
-
 
             if conf < conf_threshold {
                 continue;
@@ -76,8 +69,16 @@ impl FaceDetector {
         let final_boxes = nms(boxes, 0.45);
         let mut faces = vec![];
         for b in &final_boxes {
-            let face = img.clone().crop(b.xmin as u32, b.ymin as u32, (b.xmax - b.xmin) as u32, (b.ymax- b.ymin) as u32);
-            faces.push(DetectedFace{face_image: face, bbox: b.clone()});
+            let face = img.clone().crop(
+                b.xmin as u32,
+                b.ymin as u32,
+                (b.xmax - b.xmin) as u32,
+                (b.ymax - b.ymin) as u32,
+            );
+            faces.push(DetectedFace {
+                face_image: face,
+                bbox: b.clone(),
+            });
         }
 
         faces
@@ -88,7 +89,6 @@ pub struct DetectedFace {
     pub face_image: DynamicImage,
     pub bbox: BBox, // Bounding box in the original image
 }
-
 
 pub struct ResizedImage {
     pub scaled_image: DynamicImage,
@@ -104,14 +104,8 @@ impl ResizedImage {
     }
 }
 
-pub fn scale_image<const HEIGHT: u32, const WIDTH: u32>(
-    image: DynamicImage,
-) -> ResizedImage {
-    let resized = image.resize_exact(
-        WIDTH,
-        HEIGHT,
-        image::imageops::FilterType::Triangle,
-    );
+pub fn scale_image<const HEIGHT: u32, const WIDTH: u32>(image: DynamicImage) -> ResizedImage {
+    let resized = image.resize_exact(WIDTH, HEIGHT, image::imageops::FilterType::Triangle);
 
     ResizedImage {
         scaled_image: resized,
@@ -119,10 +113,7 @@ pub fn scale_image<const HEIGHT: u32, const WIDTH: u32>(
         base_y: image.height(),
     }
 }
-fn image_to_tensor(
-    image: &image::DynamicImage,
-    device: &Device<Wgpu>,
-) -> Tensor<Wgpu, 4> {
+fn image_to_tensor(image: &image::DynamicImage, device: &Device<Wgpu>) -> Tensor<Wgpu, 4> {
     let rgb = image.to_rgb8();
     let (width, height) = rgb.dimensions();
 
@@ -137,10 +128,7 @@ fn image_to_tensor(
         }
     }
 
-    let tensor_data = TensorData::new(
-        data,
-        [1, 3, height as usize, width as usize],
-    );
+    let tensor_data = TensorData::new(data, [1, 3, height as usize, width as usize]);
 
     Tensor::from_data(tensor_data, device)
 }
@@ -184,13 +172,12 @@ pub struct BBox {
     pub score: f32,
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::face_detector::FaceDetector;
     use crate::yolo;
-    use burn::backend::wgpu::WgpuDevice;
     use burn::backend::Wgpu;
+    use burn::backend::wgpu::WgpuDevice;
     use image::open;
     use std::sync::Arc;
 
@@ -218,7 +205,9 @@ mod tests {
             device: Arc::new(Box::new(device)),
         };
 
-        let image = open("test/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg").expect("Failed to open image");
+        let image =
+            open("test/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg")
+                .expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 0);
     }
@@ -232,7 +221,10 @@ mod tests {
             device: Arc::new(Box::new(device)),
         };
 
-        let image = open("test/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg").expect("Failed to open image");
+        let image = open(
+            "test/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg",
+        )
+        .expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 0);
     }

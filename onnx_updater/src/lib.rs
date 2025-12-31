@@ -10,8 +10,11 @@ pub fn init() -> Result<(), anyhow::Error> {
         venv_dir.join("bin/pip")
     };
 
-    println!("cargo:warning=pip path {}", pip_path.clone().into_os_string().into_string().unwrap());
-    println!("cargo:warning=Installing Python dependencies...");
+    println!(
+        "pip path {}",
+        pip_path.clone().into_os_string().into_string().unwrap()
+    );
+    println!("Installing Python dependencies...");
     let status = Command::new(&pip_path)
         .arg("install")
         .arg("--upgrade")
@@ -21,14 +24,13 @@ pub fn init() -> Result<(), anyhow::Error> {
         panic!("Failed to upgrade pip");
     }
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let requirements = manifest_dir
-        .join("python")
-        .join("requirements.txt");
+    let requirements = manifest_dir.join("python").join("requirements.txt");
     let status = Command::new(&pip_path)
         .arg("install")
         .arg("-r")
         .arg(&requirements)
-        .status()?;    if !status.success() {
+        .status()?;
+    if !status.success() {
         panic!("Failed to install required Python packages");
     }
 
@@ -38,7 +40,7 @@ pub fn init() -> Result<(), anyhow::Error> {
 pub fn get_venv_dir() -> Result<PathBuf, anyhow::Error> {
     let venv_dir = PathBuf::from("..").join(".venv");
     if !venv_dir.exists() {
-        println!("cargo:warning=Creating Python venv...");
+        println!("Creating Python venv...");
         let python = which::which("python3")?;
         let status = Command::new(python)
             .arg("-m")
@@ -60,9 +62,7 @@ pub fn update(input_model: &PathBuf, output_model: &PathBuf) -> Result<(), anyho
         venv_dir.join("bin/python3")
     };
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let upgrade_script = manifest_dir
-        .join("python")
-        .join("upgrade_opset.py");
+    let upgrade_script = manifest_dir.join("python").join("upgrade_opset.py");
 
     println!("Running opset upgrade script...");
     let status = Command::new(&python_path)

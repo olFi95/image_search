@@ -1,10 +1,9 @@
-use std::fs;
 use burn_import::onnx::ModelGen;
 use hf_hub::api::sync::Api;
+use std::fs;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let api = Api::new()?;
     let repo = api.model("Xenova/clip-vit-large-patch14".to_string());
     let downloaded_model = repo.get("onnx/vision_model.onnx")?;
@@ -24,7 +23,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !dest_dir.exists() {
         fs::create_dir_all(&dest_dir)?;
     }
-    fs::copy(out_dir.join("clip_vit_large_patch14").join("vision_model.bpk"), PathBuf::from("../models/vision_model.bpk"))?;
+    fs::copy(
+        out_dir
+            .join("clip_vit_large_patch14")
+            .join("vision_model.bpk"),
+        PathBuf::from("../models/vision_model.bpk"),
+    )?;
     Ok(())
-
 }

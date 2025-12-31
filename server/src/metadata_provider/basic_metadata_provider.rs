@@ -1,4 +1,6 @@
-use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
+use crate::metadata_provider::metadata_provider::{
+    BaseImageWithImage, Metadata, MetadataProvider,
+};
 use log::error;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
@@ -7,14 +9,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use surrealdb::engine::remote::ws::Client;
-use surrealdb::{RecordId, Surreal};
-use crate::metadata_provider::image_hash_metadata_provider::{ImageHashMetadata, ImageHashMetadataRepository};
+use surrealdb::{Surreal};
 
 pub struct BasicMetadataProvider;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BasicMetadata{
+pub struct BasicMetadata {
     pub file_extension: Option<String>,
     pub height: u32,
     pub width: u32,
@@ -22,19 +22,22 @@ pub struct BasicMetadata{
     pub created: Option<SystemTime>,
 }
 
-
 impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvider {
-    fn extract(&self, base_images: &Vec<BaseImageWithImage>) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
+    fn extract(
+        &self,
+        base_images: &Vec<BaseImageWithImage>,
+    ) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
         let results: Vec<Metadata<BasicMetadata>> = base_images
             .par_iter()
             .map(|base_image| {
                 let metadata_result = fs::metadata(&base_image.base_image.path);
 
                 if metadata_result.is_ok() {
-                    let file_extension = match PathBuf::from(&base_image.base_image.path).extension(){
-                        Some(ext) => Some(ext.to_string_lossy().to_string()),
-                        None => None,
-                    };
+                    let file_extension =
+                        match PathBuf::from(&base_image.base_image.path).extension() {
+                            Some(ext) => Some(ext.to_string_lossy().to_string()),
+                            None => None,
+                        };
 
                     let metadata = metadata_result.unwrap();
                     Ok(Metadata {
@@ -44,7 +47,7 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                             height: base_image.image.height(),
                             width: base_image.image.width(),
                             size_in_bytes: metadata.len(),
-                            created: match metadata.created(){
+                            created: match metadata.created() {
                                 Ok(time) => Some(time),
                                 Err(_) => None,
                             },
@@ -52,10 +55,12 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                         base: base_image.base_image.id.clone(),
                     })
                 } else {
-                    error!("unable to get file metadata for image {}", &base_image.base_image.path);
+                    error!(
+                        "unable to get file metadata for image {}",
+                        &base_image.base_image.path
+                    );
                     Err(metadata_result.unwrap_err())
                 }
-
             })
             .filter(|metadata_result| metadata_result.is_ok())
             .map(|metadata_result| metadata_result.unwrap())
@@ -73,21 +78,22 @@ pub struct BasicMetadataRepository {
 }
 
 impl BasicMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self{
-        Self::prepare_repository(&db).await.expect("cannot prepare repository with indexes");
+    pub async fn new(db: Surreal<Client>) -> Self {
+        Self::prepare_repository(&db)
+            .await
+            .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(
-        db: &Surreal<Client>,
-    ) -> anyhow::Result<()> {
-        db.query(format!(r#"
+    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+        db.query(format!(
+            r#"
             DEFINE INDEX IF NOT EXISTS {BASIC_METADATA_DATA_NAME}_base_unique
             ON {BASIC_METADATA_DATA_NAME}
             FIELDS base
             UNIQUE;
-            "#),
-        )
-            .await?;
+            "#
+        ))
+        .await?;
 
         Ok(())
     }
@@ -96,7 +102,6 @@ impl BasicMetadataRepository {
         &self,
         items: &Vec<Metadata<BasicMetadata>>,
     ) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
-
         if items.is_empty() {
             return Ok(Vec::new());
         }
@@ -104,17 +109,22 @@ impl BasicMetadataRepository {
         let mut inserted = Vec::new();
 
         for item in items {
-            let base_id = item.base.clone().ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
+            let base_id = item
+                .base
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("Base ID missing"))?;
 
-            let metadata = match item.metadata.clone(){
+            let metadata = match item.metadata.clone() {
                 Some(metadata) => metadata,
                 None => {
                     error!("BasicMetadata is missing for ID {:?}", item.id);
                     continue;
                 }
             };
-            let mut response = self.db
-                .query(format!(r#"
+            let mut response = self
+                .db
+                .query(format!(
+                    r#"
                 LET $tmp = (
                     UPSERT {BASIC_METADATA_DATA_NAME}
                     SET file_extension = $file_extension,
@@ -125,7 +135,8 @@ impl BasicMetadataRepository {
                 );
                 LET $id = $tmp[0].id;
                 RELATE $base -> {BASIC_METADATA_RELATION_NAME} -> $id;
-                "#))
+                "#
+                ))
                 .bind(("base", base_id.clone()))
                 .bind(("file_extension", metadata.file_extension))
                 .bind(("height", metadata.height))

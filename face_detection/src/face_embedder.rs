@@ -1,8 +1,8 @@
 use crate::arcface;
-use burn::backend::wgpu::WgpuDevice;
-use burn::backend::Wgpu;
-use burn::prelude::Device;
 use burn::Tensor;
+use burn::backend::Wgpu;
+use burn::backend::wgpu::WgpuDevice;
+use burn::prelude::Device;
 use image::DynamicImage;
 use std::sync::Arc;
 
@@ -13,7 +13,10 @@ pub struct FaceEmbedder {
 
 impl FaceEmbedder {
     pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
-        let model = Box::new(arcface::Model::from_file(model_path, device.as_ref().as_ref()));
+        let model = Box::new(arcface::Model::from_file(
+            model_path,
+            device.as_ref().as_ref(),
+        ));
         FaceEmbedder {
             model: Arc::new(model),
             device,
@@ -55,30 +58,34 @@ impl FaceEmbedder {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use crate::face_detector::FaceDetector;
-    use crate::{arcface, yolo};
-    use burn::backend::wgpu::WgpuDevice;
-    use burn::backend::Wgpu;
-    use image::open;
     use crate::face_embedder::FaceEmbedder;
+    use crate::{arcface, yolo};
+    use burn::backend::Wgpu;
+    use burn::backend::wgpu::WgpuDevice;
+    use image::open;
+    use std::sync::Arc;
 
     #[test]
     fn embed_all_faces_of_group_photo() {
         let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
 
         let face_detector = {
-            let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", device.as_ref().as_ref());
+            let model: yolo::Model<Wgpu> =
+                yolo::Model::from_file("../models/yolo.bpk", device.as_ref().as_ref());
             FaceDetector {
-            model: Arc::new(Box::new(model)),
-            device: device.clone(),
-        }};
-        let face_embedder = {
-            let model: arcface::Model<Wgpu> = arcface::Model::from_file("../models/arcface_model.bpk", device.as_ref().as_ref());
-            FaceEmbedder {
-            model: Arc::new(Box::new(model)),
+                model: Arc::new(Box::new(model)),
                 device: device.clone(),
-        }};
+            }
+        };
+        let face_embedder = {
+            let model: arcface::Model<Wgpu> =
+                arcface::Model::from_file("../models/arcface_model.bpk", device.as_ref().as_ref());
+            FaceEmbedder {
+                model: Arc::new(Box::new(model)),
+                device: device.clone(),
+            }
+        };
 
         let image = open("test/pexels-fauxels-3184398.jpg").expect("Failed to open image");
         let faces = face_detector.detect(&image);
@@ -87,7 +94,5 @@ mod tests {
             embeddings.push(face_embedder.embed(face.face_image));
         }
         assert_eq!(embeddings.len(), 7);
-
     }
 }
-
