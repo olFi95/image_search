@@ -24,11 +24,10 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
 use std::sync::Arc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::Surreal;
+use surrealdb::{Connection, Surreal};
 
-pub struct MetadataIndexer {
-    db: Surreal<Client>,
+pub struct MetadataIndexer<C> where C: Connection {
+    db: Surreal<C>,
     device: Arc<Box<Device<Wgpu>>>,
     face_detector: String,
     face_embedder: String,
@@ -36,9 +35,9 @@ pub struct MetadataIndexer {
     image_embedder: String,
 }
 
-impl MetadataIndexer {
+impl <C>MetadataIndexer<C> where C: Connection {
     pub fn new(
-        db: Surreal<Client>,
+        db: Surreal<C>,
         device: Arc<Box<Device<Wgpu>>>,
         face_embedder: String,
         face_detector: String,

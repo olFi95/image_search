@@ -1,8 +1,7 @@
 use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
 use clip::ImageEmbedder;
 use serde::{Deserialize, Serialize};
-use surrealdb::Surreal;
-use surrealdb::engine::remote::ws::Client;
+use surrealdb::{Connection, Surreal};
 
 pub struct ImageEmbeddingMetadataProvider {
     image_embedder: ImageEmbedder,
@@ -41,20 +40,20 @@ impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMeta
         Ok(results)
     }
 }
-pub struct ImageEmbeddingMetadataRepository {
-    db: Surreal<Client>,
+pub struct ImageEmbeddingMetadataRepository<C: Connection> {
+    db: Surreal<C>,
 }
 static IMAGE_EMBEDDING_VECTOR_DATA_NAME: &str = "image_embedding_vector";
 static IMAGE_EMBEDDING_VECTOR_RELATION_NAME: &str = "has_image_embedding_vector";
 
-impl ImageEmbeddingMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
             DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_base_unique

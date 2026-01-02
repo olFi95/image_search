@@ -2,9 +2,12 @@ use crate::AppState;
 use embed_anything::embeddings::embed::Embedder;
 use log::{error, info};
 use std::path::PathBuf;
+use surrealdb::Connection;
 use walkdir::WalkDir;
 
-pub async fn clip(state: &AppState, input: String) -> Vec<f32> {
+pub async fn clip<C>(state: &AppState<C>, input: String) -> Vec<f32>
+    where C: Connection {
+
     let clip_embedder = state.embedder.lock().await;
     let embedding_result = &clip_embedder.embed(&[&input], None, None).await.unwrap()[0];
     embedding_result.to_dense().unwrap()

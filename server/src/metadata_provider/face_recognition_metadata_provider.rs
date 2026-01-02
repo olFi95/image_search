@@ -7,8 +7,7 @@ use image::DynamicImage;
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{ Surreal};
+use surrealdb::{Connection, Surreal};
 
 pub struct FaceRecognitionMetadataProvider {
     face_detector: FaceDetector,
@@ -121,18 +120,18 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
     }
 }
 
-pub struct FaceRecognitionMetadataRepository {
-    db: Surreal<Client>,
+pub struct FaceRecognitionMetadataRepository<C: Connection> {
+    db: Surreal<C>,
 }
 
-impl FaceRecognitionMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl <C: Connection>FaceRecognitionMetadataRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
             DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_unique

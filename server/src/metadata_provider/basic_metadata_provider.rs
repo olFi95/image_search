@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{Surreal};
+use surrealdb::{Connection, Surreal};
 
 pub struct BasicMetadataProvider;
 
@@ -73,18 +72,18 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
 static BASIC_METADATA_DATA_NAME: &str = "basic_metadata";
 static BASIC_METADATA_RELATION_NAME: &str = "has_basic_metadata";
 
-pub struct BasicMetadataRepository {
-    db: Surreal<Client>,
+pub struct BasicMetadataRepository<C: Connection> {
+    db: Surreal<C>,
 }
 
-impl BasicMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl <C: Connection>BasicMetadataRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
             DEFINE INDEX IF NOT EXISTS {BASIC_METADATA_DATA_NAME}_base_unique

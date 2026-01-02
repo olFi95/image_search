@@ -6,8 +6,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::{Connection, RecordId, Surreal};
 
 pub struct ImageHashMetadataProvider;
 
@@ -51,17 +50,17 @@ impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetada
 
 static IMAGE_HASH_DATA_NAME: &str = "image_hash_metadata";
 static IMAGE_HASH_RELATION_NAME: &str = "has_image_hash_metadata";
-pub struct ImageHashMetadataRepository {
-    db: Surreal<Client>,
+pub struct ImageHashMetadataRepository<C> where C: Connection {
+    db: Surreal<C>,
 }
-impl ImageHashMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl <C: Connection>ImageHashMetadataRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
             DEFINE INDEX IF NOT EXISTS {IMAGE_HASH_DATA_NAME}_base_unique
@@ -165,6 +164,8 @@ mod tests {
         BaseImage, BaseImageWithImage, MetadataProvider,
     };
     use image::{ColorType, DynamicImage};
+    use surrealdb::engine::local::{Db, Mem};
+    use surrealdb::Surreal;
 
     #[test]
     fn test_image_hash_metadata_provider() {

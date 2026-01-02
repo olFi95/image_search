@@ -1,9 +1,8 @@
-use image::{DynamicImage, open};
+use image::{open, DynamicImage};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::{Connection, RecordId, Surreal};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BaseImage {
@@ -57,17 +56,17 @@ pub trait MetadataProvider<B, M> {
     fn extract(&self, base_data_elements: &Vec<B>) -> anyhow::Result<Vec<Metadata<M>>>;
 }
 
-pub struct BaseImageRepository {
-    db: Surreal<Client>,
+pub struct BaseImageRepository<C: Connection> {
+    db: Surreal<C>,
 }
-impl BaseImageRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl <C: Connection>BaseImageRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(
             r#"
             DEFINE INDEX IF NOT EXISTS base_image_unique_path

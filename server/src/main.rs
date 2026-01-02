@@ -11,8 +11,7 @@ use env_logger::Env;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::{Connection, RecordId, Surreal};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -30,9 +29,10 @@ struct DbImage {
 }
 
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppState<C>
+where C:Connection{
     pub arguments: ServerArguments,
-    pub db: Arc<Mutex<Surreal<Client>>>,
+    pub db: Arc<Mutex<Surreal<C>>>,
     pub embedder: Arc<Mutex<Embedder>>,
 }
 

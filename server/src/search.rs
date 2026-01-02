@@ -10,7 +10,8 @@ use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::RecordId;
+use surrealdb::{Connection, RecordId};
+use surrealdb::engine::remote::ws::Client;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -19,10 +20,10 @@ pub struct ImageType {
     pub embedding: Vec<f32>,
 }
 
-pub async fn web_search_text(
-    State(state): State<AppState>,
+pub async fn web_search_text<C>(
+    State(state): State<AppState<C>>,
     Json(params): Json<SearchParams>,
-) -> Result<Json<SearchResponse>, StatusCode> {
+) -> Result<Json<SearchResponse>, StatusCode> where C: Connection{
     debug!("Handle Search with params: {:?}", params);
 
     let db = state.db.lock().await; // oder wie du deine DB-Instanz nutzt
@@ -124,7 +125,7 @@ pub async fn web_search_text(
 }
 
 #[axum::debug_handler]
-pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse {
+pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoResponse{
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {

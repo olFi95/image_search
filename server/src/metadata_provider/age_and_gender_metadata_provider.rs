@@ -3,8 +3,7 @@ use crate::metadata_provider::metadata_provider::{Metadata, MetadataProvider};
 use face_detection::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
 use log::error;
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::Surreal;
+use surrealdb::{Connection, Surreal};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceAgeAndGender {
@@ -79,20 +78,19 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for AgeAndGende
     }
 }
 
-pub struct FaceAgeAndGenderMetadataRepository {
-    db: Surreal<Client>,
+pub struct FaceAgeAndGenderMetadataRepository<C: Connection> {
+    db: Surreal<C>,
 }
-
 static FACE_AGE_AND_GENDER_DATA_NAME: &str = "face_age_and_gender_estimation";
 static FACE_AGE_AND_GENDER_RELATION_NAME: &str = "has_face_age_and_gender_estimation";
-impl FaceAgeAndGenderMetadataRepository {
-    pub async fn new(db: Surreal<Client>) -> Self {
+impl<C: Connection> FaceAgeAndGenderMetadataRepository<C> {
+    pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
             .await
             .expect("cannot prepare repository with indexes");
         Self { db }
     }
-    async fn prepare_repository(db: &Surreal<Client>) -> anyhow::Result<()> {
+    async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
             DEFINE INDEX IF NOT EXISTS {FACE_AGE_AND_GENDER_DATA_NAME}_base_unique
