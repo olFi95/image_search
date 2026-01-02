@@ -87,7 +87,7 @@ mod tests {
             }
         };
 
-        let image = open("test/pexels-fauxels-3184398.jpg").expect("Failed to open image");
+        let image = open("../../test_pictures/pexels-fauxels-3184398.jpg").expect("Failed to open image");
         let faces = face_detector.detect(&image);
         let mut embeddings = Vec::new();
         for face in faces {

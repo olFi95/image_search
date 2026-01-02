@@ -190,7 +190,7 @@ mod tests {
             device: Arc::new(Box::new(device)),
         };
 
-        let image = open("test/pexels-fauxels-3184398.jpg").expect("Failed to open image");
+        let image = open("../../test_pictures/pexels-fauxels-3184398.jpg").expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 7);
     }
@@ -206,7 +206,7 @@ mod tests {
         };
 
         let image =
-            open("test/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg")
+            open("../../test_pictures/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg")
                 .expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 0);
@@ -222,7 +222,7 @@ mod tests {
         };
 
         let image = open(
-            "test/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg",
+            "../../test_pictures/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg",
         )
         .expect("Failed to open image");
         let faces = face_detector.detect(&image);
