@@ -53,6 +53,7 @@ static IMAGE_HASH_RELATION_NAME: &str = "has_image_hash_metadata";
 pub struct ImageHashMetadataRepository<C> where C: Connection {
     db: Surreal<C>,
 }
+
 impl <C: Connection>ImageHashMetadataRepository<C> {
     pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
@@ -104,8 +105,7 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
                     r#"
                 LET $tmp = (
                     UPSERT {IMAGE_HASH_DATA_NAME}
-                    SET base = $base,
-                        hash = $hash,
+                    SET hash = $hash,
                         hash_type = $hash_type
                     WHERE base = $base
                 );
@@ -127,43 +127,41 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
         Ok(inserted)
     }
 
-    pub async fn find_by_bases(
+    pub(crate) async fn get_image_hashes_for_base_images(
         &self,
-        base_ids: Vec<RecordId>,
-    ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
-        if base_ids.is_empty() {
-            return Ok(Vec::new());
-        }
+        base_images: &[BaseImage],
+    ) -> Vec<ImageHashMetadata> {
+        let base_ids: Vec<RecordId> = base_images
+            .iter()
+            .filter_map(|img| img.id.clone())
+            .collect();
 
         let mut response = self
             .db
             .query(format!(
-                "SELECT *
-             FROM {IMAGE_HASH_DATA_NAME}
-             WHERE base IN $base_ids"
+                r#"
+            SELECT VALUE ->{IMAGE_HASH_RELATION_NAME}-> {IMAGE_HASH_DATA_NAME}.*
+            FROM $base_ids
+            "#
             ))
             .bind(("base_ids", base_ids))
-            .await?;
+            .await
+            .expect("cannot query image hashes for base images");
 
-        let items: Vec<Metadata<ImageHashMetadata>> = response.take(0)?;
-        Ok(items)
-    }
-    pub async fn find_by_base_images(
-        &self,
-        images: &[BaseImage],
-    ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
-        let base_ids: Vec<RecordId> = images.iter().filter_map(|img| img.id.clone()).collect();
+        let nested: Vec<Vec<ImageHashMetadata>> = response
+            .take(0)
+            .expect("cannot take image hashes from response");
 
-        self.find_by_bases(base_ids).await
+        nested.into_iter().flatten().collect()
     }
+
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata_provider::metadata_provider::{
-        BaseImage, BaseImageWithImage, MetadataProvider,
-    };
+    use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider};
     use image::{ColorType, DynamicImage};
+    use std::path::PathBuf;
     use surrealdb::engine::local::{Db, Mem};
     use surrealdb::Surreal;
 
@@ -198,5 +196,51 @@ mod tests {
         assert!(&results[0].metadata.is_some());
         assert!(&results[1].metadata.is_some());
         assert!(&results[2].metadata.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_image_hash_calculation() {
+        let db = setup_db().await;
+        let image_hash_metadata_repository =
+            super::ImageHashMetadataRepository::new(db.clone()).await;
+        let base_image_repository = BaseImageRepository::new(db.clone()).await;
+        let image_hash_metadata_provider = super::ImageHashMetadataProvider{};
+        let image_path = "../test_pictures/0_1.jpg";
+        let base_images: Vec<BaseImage> = vec![image_path]
+            .iter()
+            .map(|path| BaseImage::new(PathBuf::from(path)))
+            .collect();
+        let base_images = base_image_repository
+            .insert_many(base_images)
+            .await
+            .expect("Inserting base image failed");
+        let base_images_with_image: Vec<_> = base_images
+            .iter()
+            .cloned()
+            .map(|bi| bi.try_into())
+            .filter(|biwi| biwi.is_ok())
+            .map(|biwi| biwi.unwrap())
+            .collect();
+
+
+        let hashes = image_hash_metadata_provider.extract(&base_images_with_image).expect("cannot calculate hashes images");
+        let _ = image_hash_metadata_repository
+            .insert_many(&hashes)
+            .await
+            .expect("cannot insert hashes");
+        let base_image_entries = base_image_repository.get_base_image_by_path(image_path).await;
+        assert_eq!(base_image_entries.len(), 1, "No base_image was found even though it was just inserted");
+        let base_image_entry = &base_image_entries[0];
+        assert_eq!(base_image_entry.path, image_path);
+        let image_hash_entries = image_hash_metadata_repository.get_image_hashes_for_base_images(&base_image_entries).await;
+        assert_eq!(image_hash_entries.len(), 1, "No image_hash was found even though it was just inserted");
+        let image_hash_entry = &image_hash_entries[0];
+        assert_eq!(image_hash_entry.hash_type, "SHA256");
+        assert_eq!(hex::encode(image_hash_entry.hash), "d78f6226b8b5bab6ba377b9de4f2d7172336a82688e288fbfa85533d73dcd3c6");
+    }
+    async fn setup_db() -> Surreal<Db> {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+        db
     }
 }

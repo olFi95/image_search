@@ -59,6 +59,15 @@ pub trait MetadataProvider<B, M> {
 pub struct BaseImageRepository<C: Connection> {
     db: Surreal<C>,
 }
+
+impl<C: Connection> BaseImageRepository<C> {
+    pub(crate) async fn get_base_image_by_path(&self, path: &str) -> Vec<BaseImage> {
+        let mut response = self.db.query("SELECT * FROM base_image WHERE path = $path")
+            .bind(("path", path.to_string())).await.expect("failed to get base image");
+        response.take(0).unwrap_or_default()
+    }
+}
+
 impl <C: Connection>BaseImageRepository<C> {
     pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
