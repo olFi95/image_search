@@ -129,7 +129,7 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
 
     pub(crate) async fn get_image_hashes_for_base_images(
         &self,
-        base_images: &[BaseImage],
+        base_images: &[&BaseImage],
     ) -> Vec<ImageHashMetadata> {
         let base_ids: Vec<RecordId> = base_images
             .iter()
@@ -200,7 +200,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_image_hash_calculation() {
-        let db = setup_db().await;
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
         let image_hash_metadata_repository =
             super::ImageHashMetadataRepository::new(db.clone()).await;
         let base_image_repository = BaseImageRepository::new(db.clone()).await;
@@ -228,19 +229,14 @@ mod tests {
             .insert_many(&hashes)
             .await
             .expect("cannot insert hashes");
-        let base_image_entries = base_image_repository.get_base_image_by_path(image_path).await;
-        assert_eq!(base_image_entries.len(), 1, "No base_image was found even though it was just inserted");
-        let base_image_entry = &base_image_entries[0];
+        let base_image_entry_result = base_image_repository.get_base_image_by_path(image_path).await;
+        assert!(base_image_entry_result.is_some(), "No base_image was found even though it was just inserted");
+        let base_image_entry = base_image_entry_result.unwrap();
         assert_eq!(base_image_entry.path, image_path);
-        let image_hash_entries = image_hash_metadata_repository.get_image_hashes_for_base_images(&base_image_entries).await;
+        let image_hash_entries = image_hash_metadata_repository.get_image_hashes_for_base_images(&[&base_image_entry]).await;
         assert_eq!(image_hash_entries.len(), 1, "No image_hash was found even though it was just inserted");
         let image_hash_entry = &image_hash_entries[0];
         assert_eq!(image_hash_entry.hash_type, "SHA256");
         assert_eq!(hex::encode(image_hash_entry.hash), "d78f6226b8b5bab6ba377b9de4f2d7172336a82688e288fbfa85533d73dcd3c6");
-    }
-    async fn setup_db() -> Surreal<Db> {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("test").use_db("test").await.unwrap();
-        db
     }
 }

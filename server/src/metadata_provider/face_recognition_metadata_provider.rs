@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
+use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
 use burn_wgpu::Wgpu;
 use face_detection::face_detector::FaceDetector;
@@ -122,6 +122,12 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
 
 pub struct FaceRecognitionMetadataRepository<C: Connection> {
     db: Surreal<C>,
+}
+
+impl<C: Connection> FaceRecognitionMetadataRepository<C> {
+    pub(crate) async fn get_faces_of_base_image(&self, base_image: &BaseImage) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
+        todo!()
+    }
 }
 
 impl <C: Connection>FaceRecognitionMetadataRepository<C> {

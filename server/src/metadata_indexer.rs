@@ -214,8 +214,91 @@ impl <C>MetadataIndexer<C> where C: Connection {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use burn::prelude::Device;
+    use burn_wgpu::WgpuDevice;
+    use surrealdb::engine::local::{Db, Mem};
+    use surrealdb::Surreal;
+    use crate::metadata_indexer::MetadataIndexer;
+    use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository};
 
     #[test]
-    fn test_metadata_indexer() {}
+    fn embed_test_images() {
+        std::thread::Builder::new()
+            .name("embed-test".into())
+            .stack_size(64 * 1024 * 1024) // 64 MB Stack
+            .spawn(|| {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .thread_stack_size(32 * 1024 * 1024)
+                    .build()
+                    .unwrap();
+
+                rt.block_on(async {
+                    use std::path::PathBuf;
+                    use std::sync::Arc;
+                    use burn_wgpu::WgpuDevice;
+                    use surrealdb::engine::local::{Mem};
+                    use surrealdb::Surreal;
+
+                    let db = Surreal::new::<Mem>(()).await.unwrap();
+                    db.use_ns("test").use_db("test").await.unwrap();
+
+                    let metadata_indexer = MetadataIndexer::new(
+                        db.clone(),
+                        Arc::new(Box::new(WgpuDevice::DefaultDevice)),
+                        "../models/arcface_model.bpk".to_string(),
+                        "../models/yolo.bpk".to_string(),
+                        "../models/vision_model.bpk".to_string(),
+                        "../models/age_gender.bpk".to_string(),
+                    );
+
+                    metadata_indexer
+                        .index_metadata(PathBuf::from("../test_pictures"))
+                        .await
+                        .expect("cannot index metadata");
+
+                    let base_image_repository = BaseImageRepository::new(db.clone()).await;
+                    let image_hash_metadata_repository =
+                        super::ImageHashMetadataRepository::new(db.clone()).await;
+                    let basic_metadata_repository =
+                        super::BasicMetadataRepository::new(db.clone()).await;
+                    let face_recognition_metadata_repository =
+                        super::FaceRecognitionMetadataRepository::new(db.clone()).await;
+                    let image_embedding_metadata_repository =
+                        super::ImageEmbeddingMetadataRepository::new(db.clone()).await;
+                    let age_and_gender_metadata_repository =
+                        super::FaceAgeAndGenderMetadataRepository::new(db.clone()).await;
+
+
+                    // Image 0_1.jpg -> 0 People in there.
+                    {
+                        let base_image_0_1 = base_image_repository.get_base_image_by_path("../test_pictures/0_1.jpg").await;
+                        assert!(base_image_0_1.is_some());
+                        let base_image_0_1 = base_image_0_1.unwrap();
+                        let image_hashes = image_hash_metadata_repository.get_image_hashes_for_base_images(&[&base_image_0_1]).await;
+                        assert_eq!(image_hashes.len(), 1);
+                        let base_image_0_1_image_hash = image_hashes[0].clone();
+                        assert_eq!(base_image_0_1_image_hash.hash_type, "SHA256");
+                        assert_eq!(hex::encode(base_image_0_1_image_hash.hash), "d78f6226b8b5bab6ba377b9de4f2d7172336a82688e288fbfa85533d73dcd3c6");
+                    }
+                    // Image 1_1.jpg -> 1 Person in there.
+                    {
+                        let base_image_1_1 = base_image_repository.get_base_image_by_path("../test_pictures/1_1.jpg").await;
+                        assert!(base_image_1_1.is_some());
+                        let base_image_1_1 = base_image_1_1.unwrap();
+                        let image_hashes = image_hash_metadata_repository.get_image_hashes_for_base_images(&[&base_image_1_1]).await;
+                        assert_eq!(image_hashes.len(), 1);
+                        let base_image_1_1_image_hash = image_hashes[0].clone();
+                        assert_eq!(base_image_1_1_image_hash.hash_type, "SHA256");
+                        assert_eq!(hex::encode(base_image_1_1_image_hash.hash), "c57fc6e6e7a6922eeb2815baee3d3405768968b1b98205be3713ec399f0a09ee");
+                    }
+                });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }

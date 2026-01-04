@@ -61,10 +61,11 @@ pub struct BaseImageRepository<C: Connection> {
 }
 
 impl<C: Connection> BaseImageRepository<C> {
-    pub(crate) async fn get_base_image_by_path(&self, path: &str) -> Vec<BaseImage> {
+    pub(crate) async fn get_base_image_by_path(&self, path: &str) -> Option<BaseImage> {
         let mut response = self.db.query("SELECT * FROM base_image WHERE path = $path")
             .bind(("path", path.to_string())).await.expect("failed to get base image");
-        response.take(0).unwrap_or_default()
+        let result: Vec<BaseImage> = response.take(0).unwrap_or_default();
+        result.first().cloned()
     }
 }
 
