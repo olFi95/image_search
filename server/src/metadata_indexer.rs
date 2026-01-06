@@ -215,14 +215,16 @@ impl <C>MetadataIndexer<C> where C: Connection {
 
 #[cfg(test)]
 mod test {
+    use crate::metadata_indexer::MetadataIndexer;
+    use crate::metadata_provider::metadata_provider::BaseImageRepository;
+    use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
+    use burn_wgpu::WgpuDevice;
     use std::path::PathBuf;
     use std::sync::Arc;
-    use burn::prelude::Device;
-    use burn_wgpu::WgpuDevice;
-    use surrealdb::engine::local::{Db, Mem};
+    use surrealdb::engine::local::Mem;
+    use surrealdb::engine::remote::ws::Ws;
+    use surrealdb::opt::auth::Root;
     use surrealdb::Surreal;
-    use crate::metadata_indexer::MetadataIndexer;
-    use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository};
 
     #[test]
     fn embed_test_images() {
@@ -240,7 +242,7 @@ mod test {
                     use std::path::PathBuf;
                     use std::sync::Arc;
                     use burn_wgpu::WgpuDevice;
-                    use surrealdb::engine::local::{Mem};
+                    use surrealdb::engine::local::Mem;
                     use surrealdb::Surreal;
 
                     let db = Surreal::new::<Mem>(()).await.unwrap();
@@ -258,7 +260,7 @@ mod test {
                     metadata_indexer
                         .index_metadata(PathBuf::from("../test_pictures"))
                         .await
-                        .expect("cannot index metadata");
+                        .expect("cannot use db");
 
                     let base_image_repository = BaseImageRepository::new(db.clone()).await;
                     let image_hash_metadata_repository =
@@ -271,34 +273,167 @@ mod test {
                         super::ImageEmbeddingMetadataRepository::new(db.clone()).await;
                     let age_and_gender_metadata_repository =
                         super::FaceAgeAndGenderMetadataRepository::new(db.clone()).await;
-
+                    let metadata_query_engine = MetadataQueryEngine::new(db.clone());
 
                     // Image 0_1.jpg -> 0 People in there.
                     {
                         let base_image_0_1 = base_image_repository.get_base_image_by_path("../test_pictures/0_1.jpg").await;
                         assert!(base_image_0_1.is_some());
                         let base_image_0_1 = base_image_0_1.unwrap();
-                        let image_hashes = image_hash_metadata_repository.get_image_hashes_for_base_images(&[&base_image_0_1]).await;
-                        assert_eq!(image_hashes.len(), 1);
-                        let base_image_0_1_image_hash = image_hashes[0].clone();
-                        assert_eq!(base_image_0_1_image_hash.hash_type, "SHA256");
-                        assert_eq!(hex::encode(base_image_0_1_image_hash.hash), "d78f6226b8b5bab6ba377b9de4f2d7172336a82688e288fbfa85533d73dcd3c6");
+
+                        let base_image_0_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_0_1).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_0_1_metadata.path, "../test_pictures/0_1.jpg");
+
+                        assert_eq!(hex::encode(base_image_0_1_metadata.image_hash[0].hash), "d78f6226b8b5bab6ba377b9de4f2d7172336a82688e288fbfa85533d73dcd3c6");
+                        assert_eq!(base_image_0_1_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_0_1_metadata.faces.len(), 0);
+
+                        assert_eq!(base_image_0_1_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_0_1_metadata.basic_metadata[0].height, 882);
+                        assert_eq!(base_image_0_1_metadata.basic_metadata[0].width, 1280);
+                        assert_eq!(base_image_0_1_metadata.basic_metadata[0].size_in_bytes, 138108);
+                        assert_eq!(base_image_0_1_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
+
+                    }
+                    // Image 0_2.jpg -> 0 People in there.
+                    {
+                        let base_image_0_2 = base_image_repository.get_base_image_by_path("../test_pictures/0_2.jpg").await;
+                        assert!(base_image_0_2.is_some());
+                        let base_image_0_2 = base_image_0_2.unwrap();
+
+                        let base_image_0_2_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_0_2).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_0_2_metadata.path, "../test_pictures/0_2.jpg");
+
+                        assert_eq!(hex::encode(base_image_0_2_metadata.image_hash[0].hash), "5bd29a53940be3567570757683ea71493b81a94089a79986f79f7d2db19e4976");
+                        assert_eq!(base_image_0_2_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_0_2_metadata.faces.len(), 0);
+
+                        assert_eq!(base_image_0_2_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_0_2_metadata.basic_metadata[0].height, 801);
+                        assert_eq!(base_image_0_2_metadata.basic_metadata[0].width, 1200);
+                        assert_eq!(base_image_0_2_metadata.basic_metadata[0].size_in_bytes, 150070);
+                        assert_eq!(base_image_0_2_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
+                    }
+                    // Image 0_3.jpg -> 0 People in there.
+                    {
+                        let base_image_0_3 = base_image_repository.get_base_image_by_path("../test_pictures/0_3.jpg").await;
+                        assert!(base_image_0_3.is_some());
+                        let base_image_0_3 = base_image_0_3.unwrap();
+
+                        let base_image_0_3_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_0_3).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_0_3_metadata.path, "../test_pictures/0_3.jpg");
+
+                        assert_eq!(hex::encode(base_image_0_3_metadata.image_hash[0].hash), "58722cabb0a7ab17685eb3bda6ae9f356bcae3996130169eda8a0b03d0258065");
+                        assert_eq!(base_image_0_3_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_0_3_metadata.faces.len(), 0);
+
+                        assert_eq!(base_image_0_3_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_0_3_metadata.basic_metadata[0].height, 798);
+                        assert_eq!(base_image_0_3_metadata.basic_metadata[0].width, 1200);
+                        assert_eq!(base_image_0_3_metadata.basic_metadata[0].size_in_bytes, 108473);
+                        assert_eq!(base_image_0_3_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
                     }
                     // Image 1_1.jpg -> 1 Person in there.
                     {
                         let base_image_1_1 = base_image_repository.get_base_image_by_path("../test_pictures/1_1.jpg").await;
                         assert!(base_image_1_1.is_some());
                         let base_image_1_1 = base_image_1_1.unwrap();
-                        let image_hashes = image_hash_metadata_repository.get_image_hashes_for_base_images(&[&base_image_1_1]).await;
-                        assert_eq!(image_hashes.len(), 1);
-                        let base_image_1_1_image_hash = image_hashes[0].clone();
-                        assert_eq!(base_image_1_1_image_hash.hash_type, "SHA256");
-                        assert_eq!(hex::encode(base_image_1_1_image_hash.hash), "c57fc6e6e7a6922eeb2815baee3d3405768968b1b98205be3713ec399f0a09ee");
+
+                        let base_image_1_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_1_1).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_1_1_metadata.path, "../test_pictures/1_1.jpg");
+
+                        assert_eq!(hex::encode(base_image_1_1_metadata.image_hash[0].hash), "c57fc6e6e7a6922eeb2815baee3d3405768968b1b98205be3713ec399f0a09ee");
+                        assert_eq!(base_image_1_1_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_1_1_metadata.faces.len(), 1);
+
+                        assert_eq!(base_image_1_1_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_1_1_metadata.basic_metadata[0].height, 1280);
+                        assert_eq!(base_image_1_1_metadata.basic_metadata[0].width, 853);
+                        assert_eq!(base_image_1_1_metadata.basic_metadata[0].size_in_bytes, 76361);
+                        assert_eq!(base_image_1_1_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
+                    }
+                    // Image 3_1.jpg -> 3 Persons in there.
+                    {
+                        let base_image_3_1 = base_image_repository.get_base_image_by_path("../test_pictures/3_1.jpg").await;
+                        assert!(base_image_3_1.is_some());
+                        let base_image_3_1 = base_image_3_1.unwrap();
+
+                        let base_image_3_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_3_1).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_3_1_metadata.path, "../test_pictures/3_1.jpg");
+
+                        assert_eq!(hex::encode(base_image_3_1_metadata.image_hash[0].hash), "5b3b05a8484dbfe7b483251e087f84a2e31a95867d509a9ea034a055509195a6");
+                        assert_eq!(base_image_3_1_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_3_1_metadata.faces.len(), 3);
+
+                        assert_eq!(base_image_3_1_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_3_1_metadata.basic_metadata[0].height, 853);
+                        assert_eq!(base_image_3_1_metadata.basic_metadata[0].width, 1280);
+                        assert_eq!(base_image_3_1_metadata.basic_metadata[0].size_in_bytes, 247712);
+                        assert_eq!(base_image_3_1_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
+                    }
+                    // Image 7_1.jpg -> 7 Persons in there.
+                    {
+                        let base_image_7_1 = base_image_repository.get_base_image_by_path("../test_pictures/7_1.jpg").await;
+                        assert!(base_image_7_1.is_some());
+                        let base_image_7_1 = base_image_7_1.unwrap();
+
+                        let base_image_7_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image_7_1).await.expect("cannot get metadata");
+
+                        assert_eq!(base_image_7_1_metadata.path, "../test_pictures/7_1.jpg");
+
+                        assert_eq!(hex::encode(base_image_7_1_metadata.image_hash[0].hash), "836513f25131ef5497e8cb9ee0d696b5d9597bab0126cd6abaa7a8590fbda00e");
+                        assert_eq!(base_image_7_1_metadata.image_hash[0].hash_type, "SHA256");
+
+                        assert_eq!(base_image_7_1_metadata.faces.len(), 7);
+
+                        assert_eq!(base_image_7_1_metadata.image_embedding[0].embedding.len(), 768);
+
+                        assert_eq!(base_image_7_1_metadata.basic_metadata[0].height, 3887);
+                        assert_eq!(base_image_7_1_metadata.basic_metadata[0].width, 6000);
+                        assert_eq!(base_image_7_1_metadata.basic_metadata[0].size_in_bytes, 1496498);
+                        assert_eq!(base_image_7_1_metadata.basic_metadata[0].file_extension, Some("jpg".to_string()));
                     }
                 });
             })
             .unwrap()
             .join()
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_the_test(){
+        let db = Surreal::new::<Ws>("192.168.177.2:8000").await.unwrap();
+        db
+            .signin(Root {
+                username: "root",
+                password: "root",
+            })
+            .await.expect("cannot sign in");
+        db
+            .use_ns("private")
+            .use_db("private")
+            .await
+            .expect("cannot use db");
+
+        let base_image_repository = BaseImageRepository::new(db.clone()).await;
+        let metadata_query_engine = MetadataQueryEngine::new(db.clone());
+        let base_image = base_image_repository.get_base_image_by_path("/mnt/DoPa/share/Fotos/2015/05/20150505_074336_B97A09D4.jpg").await.unwrap();
+        let base_image_0_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image).await.expect("cannot get metadata");
+        assert_eq!(base_image_0_1_metadata.image_hash[0].hash_type, "SHA256");
     }
 }

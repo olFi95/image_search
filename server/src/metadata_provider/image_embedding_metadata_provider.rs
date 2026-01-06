@@ -20,7 +20,7 @@ impl ImageEmbeddingMetadataProvider {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageEmbedding {
-    pub vector: Vec<f32>,
+    pub embedding: Vec<f32>,
 }
 
 impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider {
@@ -33,7 +33,7 @@ impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMeta
             let embedding = self.image_embedder.embed(&image.image);
             results.push(Metadata {
                 id: None,
-                metadata: Some(ImageEmbedding { vector: embedding }),
+                metadata: Some(ImageEmbedding { embedding: embedding }),
                 base: Some(image.base_image.id.clone().unwrap()),
             });
         }
@@ -102,7 +102,7 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
                 .metadata
                 .clone()
                 .ok_or(anyhow::anyhow!("Metadata missing"))?
-                .vector;
+                .embedding;
 
             let mut response = self
                 .db

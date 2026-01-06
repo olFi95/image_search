@@ -36,7 +36,7 @@ pub struct FaceInPicture {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceInPictureVector {
-    pub vector: Vec<f32>,
+    pub embedding: Vec<f32>,
 }
 
 static FACE_IN_PICTURE_DATA_NAME: &str = "face_in_picture";
@@ -112,7 +112,7 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
             let embedding = self.face_embedder.embed(face);
             results.push(Metadata {
                 id: None,
-                metadata: Some(FaceInPictureVector { vector: embedding }),
+                metadata: Some(FaceInPictureVector { embedding: embedding }),
                 base: Some(face_in_picture_id),
             });
         }
@@ -122,12 +122,6 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
 
 pub struct FaceRecognitionMetadataRepository<C: Connection> {
     db: Surreal<C>,
-}
-
-impl<C: Connection> FaceRecognitionMetadataRepository<C> {
-    pub(crate) async fn get_faces_of_base_image(&self, base_image: &BaseImage) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
-        todo!()
-    }
 }
 
 impl <C: Connection>FaceRecognitionMetadataRepository<C> {
@@ -242,7 +236,7 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                 .metadata
                 .clone()
                 .ok_or(anyhow::anyhow!("Metadata missing"))?
-                .vector;
+                .embedding;
 
             let mut response = self
                 .db
