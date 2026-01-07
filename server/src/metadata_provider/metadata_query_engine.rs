@@ -1,22 +1,14 @@
-use serde::{Deserialize, Deserializer, Serialize};
-use surrealdb::{Connection, RecordId, Surreal};
 use crate::metadata_provider::age_and_gender_metadata_provider::FaceAgeAndGender;
 use crate::metadata_provider::basic_metadata_provider::BasicMetadata;
-use crate::metadata_provider::face_recognition_metadata_provider::{FaceInPicture, FaceInPictureVector};
+use crate::metadata_provider::face_recognition_metadata_provider::FaceInPictureVector;
 use crate::metadata_provider::image_embedding_metadata_provider::ImageEmbedding;
 use crate::metadata_provider::image_hash_metadata_provider::ImageHashMetadata;
 use crate::metadata_provider::metadata_provider::BaseImage;
+use serde::{Deserialize, Serialize};
+use surrealdb::{Connection, RecordId, Surreal};
 
 pub struct MetadataQueryEngine<C: Connection> {
     db: Surreal<C>
-}
-
-fn vec_f64_to_f32<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let v = Vec::<f64>::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|x| x as f32).collect())
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -162,7 +162,7 @@ mod tests {
     use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider};
     use image::{ColorType, DynamicImage};
     use std::path::PathBuf;
-    use surrealdb::engine::local::{Db, Mem};
+    use surrealdb::engine::local::Mem;
     use surrealdb::Surreal;
 
     #[test]

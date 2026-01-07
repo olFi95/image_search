@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageWithImage, Metadata, MetadataProvider};
+use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
 use burn_wgpu::Wgpu;
 use face_detection::face_detector::FaceDetector;
@@ -112,7 +112,7 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
             let embedding = self.face_embedder.embed(face);
             results.push(Metadata {
                 id: None,
-                metadata: Some(FaceInPictureVector { embedding: embedding }),
+                metadata: Some(FaceInPictureVector { embedding }),
                 base: Some(face_in_picture_id),
             });
         }
@@ -196,11 +196,9 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                 RELATE $base -> {FACE_IN_PICTURE_RELATION_NAME} -> $id;
                 "#
                 ))
-                .query(format!(
-                    r#"
+                .query(r#"
                 $tmp[0];
-                "#
-                ))
+                "#.to_string())
                 .bind(("base", item.id.clone()))
                 .bind(("top_left_x", face_in_picture_metadata.top_left_x))
                 .bind(("top_left_y", face_in_picture_metadata.top_left_y))

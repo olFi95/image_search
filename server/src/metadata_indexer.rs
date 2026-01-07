@@ -218,13 +218,6 @@ mod test {
     use crate::metadata_indexer::MetadataIndexer;
     use crate::metadata_provider::metadata_provider::BaseImageRepository;
     use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
-    use burn_wgpu::WgpuDevice;
-    use std::path::PathBuf;
-    use std::sync::Arc;
-    use surrealdb::engine::local::Mem;
-    use surrealdb::engine::remote::ws::Ws;
-    use surrealdb::opt::auth::Root;
-    use surrealdb::Surreal;
 
     #[test]
     fn embed_test_images() {
@@ -263,16 +256,6 @@ mod test {
                         .expect("cannot use db");
 
                     let base_image_repository = BaseImageRepository::new(db.clone()).await;
-                    let image_hash_metadata_repository =
-                        super::ImageHashMetadataRepository::new(db.clone()).await;
-                    let basic_metadata_repository =
-                        super::BasicMetadataRepository::new(db.clone()).await;
-                    let face_recognition_metadata_repository =
-                        super::FaceRecognitionMetadataRepository::new(db.clone()).await;
-                    let image_embedding_metadata_repository =
-                        super::ImageEmbeddingMetadataRepository::new(db.clone()).await;
-                    let age_and_gender_metadata_repository =
-                        super::FaceAgeAndGenderMetadataRepository::new(db.clone()).await;
                     let metadata_query_engine = MetadataQueryEngine::new(db.clone());
 
                     // Image 0_1.jpg -> 0 People in there.
