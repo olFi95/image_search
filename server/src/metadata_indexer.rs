@@ -414,26 +414,4 @@ mod test {
             .join()
             .unwrap();
     }
-
-    #[tokio::test]
-    async fn test_the_test(){
-        let db = Surreal::new::<Ws>("192.168.177.2:8000").await.unwrap();
-        db
-            .signin(Root {
-                username: "root",
-                password: "root",
-            })
-            .await.expect("cannot sign in");
-        db
-            .use_ns("private")
-            .use_db("private")
-            .await
-            .expect("cannot use db");
-
-        let base_image_repository = BaseImageRepository::new(db.clone()).await;
-        let metadata_query_engine = MetadataQueryEngine::new(db.clone());
-        let base_image = base_image_repository.get_base_image_by_path("/mnt/DoPa/share/Fotos/2015/05/20150505_074336_B97A09D4.jpg").await.unwrap();
-        let base_image_0_1_metadata = metadata_query_engine.get_all_metadata_attached_to_base_image(&base_image).await.expect("cannot get metadata");
-        assert_eq!(base_image_0_1_metadata.image_hash[0].hash_type, "SHA256");
-    }
 }
