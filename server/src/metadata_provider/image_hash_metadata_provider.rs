@@ -127,6 +127,7 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
         Ok(inserted)
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn get_image_hashes_for_base_images(
         &self,
         base_images: &[&BaseImage],

@@ -61,6 +61,7 @@ pub struct BaseImageRepository<C: Connection> {
 }
 
 impl<C: Connection> BaseImageRepository<C> {
+    #[allow(dead_code)]
     pub(crate) async fn get_base_image_by_path(&self, path: &str) -> Option<BaseImage> {
         let mut response = self.db.query("SELECT * FROM base_image WHERE path = $path")
             .bind(("path", path.to_string())).await.expect("failed to get base image");
