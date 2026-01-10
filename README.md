@@ -23,7 +23,7 @@ The model `clip-vit-large-patch14` is used in this project altough be it in two 
 
 ### Local
 ```shell
-pushd clip
+pushd client
   trunk build --release -d ../target/client/dist
 popd
 cargo build --release --bin server
