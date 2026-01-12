@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.100"
-which = "8.0.0"
+anyhow = { workspace = true }
+which = { workspace = true }

@@ -4,18 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-leptos = { version = "0.8.15", features = ["csr"] }
-wasm-bindgen-futures = "0.4.56"
-web-sys = { version = "0.3.83", features = ["MouseEvent", "WheelEvent", "DomRect"] }
 data = { path = "../data" }
-serde_json = "1.0.149"
-log = "0.4.29"
-gloo-net = "0.6.0"
-serde_urlencoded = "0.7.1"
-urlencoding = "2.1.3"
-js-sys = "0.3.83"
-serde-wasm-bindgen = "0.6.5"
-getrandom = { version = "0.2.16", features = ["js"] }
+
+leptos = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+gloo-net = { workspace = true }
+serde_urlencoded = { workspace = true }
+urlencoding = { workspace = true }
+js-sys = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+# Todo: This getrandom dependency needs to be defined this way (dependencies + target.wasm.dependencies) in different versions, else it does not compile to wasm32-unknown-unknown target.
+getrandom = { version="0.2.16" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version="0.3.4", features = ["wasm_js"] }
