@@ -26,7 +26,7 @@ serde_urlencoded = "0.7.1"
 urlencoding = "2.1.3"
 js-sys = "0.3.77"
 serde-wasm-bindgen = "0.6.5"
-getrandom = { version = "0.3.4", features = ["js"] }
+getrandom = { version = "0.3.4" }
 clap = { version = "4.5.45", features = ["derive"] }
 tonic = { version = "0.14.1", features = ["transport"] }
 tonic-web = "0.14.1"

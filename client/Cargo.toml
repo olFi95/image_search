@@ -16,8 +16,11 @@ serde_urlencoded = { workspace = true }
 urlencoding = { workspace = true }
 js-sys = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-# Todo: This getrandom dependency needs to be defined this way (dependencies + target.wasm.dependencies) in different versions, else it does not compile to wasm32-unknown-unknown target.
-getrandom = { version="0.2.16" }
 
+# use default backend for getrandom
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
+
+# getrandom needs another backend when compiled to wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version="0.3.4", features = ["wasm_js"] }
+getrandom = { workspace = true, features = ["wasm_js"] }
