@@ -15,7 +15,7 @@ pub async fn clip<C>(state: &AppState<C>, input: String) -> Vec<f32>
 
 pub async fn init_embedder() -> Result<Embedder, Box<dyn std::error::Error + Send + Sync>> {
     let clip_embedder =
-        Embedder::from_pretrained_hf("Clip", "openai/clip-vit-large-patch14", None, None, None)?;
+        Embedder::from_pretrained_hf("Clip", Some("openai/clip-vit-large-patch14"), None, None)?;
     info!("Embedder initialized");
     Ok(clip_embedder)
 }
