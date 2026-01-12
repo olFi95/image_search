@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+use anyhow::Context;
 use crate::clip::init_embedder;
 use crate::database::init_database;
 use crate::search::{indexing, web_search_text};
@@ -42,10 +43,15 @@ async fn tokio_main() -> anyhow::Result<()> {
 
     let static_dir = "target/client/dist";
 
+    let surreal_db_client = init_database(&cla).await
+        .context("Failed to initialize surreal db connection!")?;
+    let embedder = init_embedder().await
+        .map_err(anyhow::Error::from_boxed)
+        .context("Failed to initialize embedder!")?;
     let app_state = AppState {
         arguments: cla.clone(),
-        db: Arc::new(Mutex::new(init_database(&cla).await.unwrap())),
-        embedder: Arc::new(Mutex::new(init_embedder().await.unwrap())),
+        db: Arc::new(Mutex::new(surreal_db_client)),
+        embedder: Arc::new(Mutex::new(embedder)),
     };
 
     let media_dir = cla.shellexpand_media_dir()?;
