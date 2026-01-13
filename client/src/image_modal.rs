@@ -1,15 +1,14 @@
-use leptos::callback::Callback;
 use leptos::html::Div;
 use leptos::prelude::*;
 use leptos::*;
 use web_sys::{MouseEvent, WheelEvent};
 #[component]
 pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl IntoView {
-    let (scale, set_scale) = create_signal(1.0_f64);
-    let (offset, set_offset) = create_signal((0.0_f64, 0.0_f64));
-    let container_ref = create_node_ref::<Div>();
-    let is_dragging = create_rw_signal(false);
-    let (last_mouse_pos, set_last_mouse_pos) = create_signal((0.0, 0.0));
+    let (scale, set_scale) = signal(1.0_f64);
+    let (offset, set_offset) = signal((0.0_f64, 0.0_f64));
+    let container_ref: NodeRef<Div> = NodeRef::new();
+    let is_dragging = RwSignal::new(false);
+    let (last_mouse_pos, set_last_mouse_pos) = signal((0.0, 0.0));
 
     let on_wheel = move |ev: WheelEvent| {
         ev.prevent_default();

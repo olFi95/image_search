@@ -5,16 +5,11 @@ use data::SearchResponse;
 use gloo_net::http::Request;
 use leptos::IntoView;
 use leptos::component;
-use leptos::ev::KeyboardEvent;
 use leptos::logging::error;
 use leptos::prelude::*;
-use leptos::prelude::*;
-use leptos::server_fn::codec::Json;
 use leptos::view;
 use serde_json::from_str;
-use serde_urlencoded::to_string;
 use serde_wasm_bindgen::to_value;
-use urlencoding::encode;
 use wasm_bindgen_futures::spawn_local;
 
 #[component]
@@ -64,7 +59,7 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             let url = format!("/scan");
             match Request::get(&url).send().await {
-                Ok(response) => {}
+                Ok(_) => {}
                 Err(e) => log::error!("Fehler beim Abrufen: {:?}", e),
             }
         });

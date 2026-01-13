@@ -1,7 +1,6 @@
 use crate::image_modal::ImageModal;
 use data::ImageReference;
 use leptos::prelude::*;
-use leptos::*;
 
 #[component]
 pub fn ImageCard(image: ImageReference, marked_images: RwSignal<Vec<String>>) -> impl IntoView {
