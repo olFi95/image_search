@@ -31,34 +31,36 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
             .map(|base_image| {
                 let metadata_result = fs::metadata(&base_image.base_image.path);
 
-                if metadata_result.is_ok() {
-                    let file_extension =
-                        match PathBuf::from(&base_image.base_image.path).extension() {
-                            Some(ext) => Some(ext.to_string_lossy().to_string()),
-                            None => None,
-                        };
+                match metadata_result {
+                    Ok(metadata) => {
+                        let file_extension =
+                            match PathBuf::from(&base_image.base_image.path).extension() {
+                                Some(ext) => Some(ext.to_string_lossy().to_string()),
+                                None => None,
+                            };
 
-                    let metadata = metadata_result.unwrap();
-                    Ok(Metadata {
-                        id: None,
-                        metadata: Some(BasicMetadata {
-                            file_extension,
-                            height: base_image.image.height(),
-                            width: base_image.image.width(),
-                            size_in_bytes: metadata.len(),
-                            created: match metadata.created() {
-                                Ok(time) => Some(time),
-                                Err(_) => None,
-                            },
-                        }),
-                        base: base_image.base_image.id.clone(),
-                    })
-                } else {
-                    error!(
+                        Ok(Metadata {
+                            id: None,
+                            metadata: Some(BasicMetadata {
+                                file_extension,
+                                height: base_image.image.height(),
+                                width: base_image.image.width(),
+                                size_in_bytes: metadata.len(),
+                                created: match metadata.created() {
+                                    Ok(time) => Some(time),
+                                    Err(_) => None,
+                                },
+                            }),
+                            base: base_image.base_image.id.clone(),
+                        })
+                    }
+                    Err(_) => {
+                        error!(
                         "unable to get file metadata for image {}",
                         &base_image.base_image.path
                     );
-                    Err(metadata_result.unwrap_err())
+                        Err(metadata_result.unwrap_err())
+                    }
                 }
             })
             .filter(|metadata_result| metadata_result.is_ok())
