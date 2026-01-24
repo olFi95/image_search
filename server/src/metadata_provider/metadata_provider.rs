@@ -15,14 +15,19 @@ impl TryInto<BaseImageWithImage> for BaseImage {
 
     fn try_into(self) -> Result<BaseImageWithImage, Self::Error> {
         let image_loading_result = open(&self.path);
-        if image_loading_result.is_ok() {
-            Ok(BaseImageWithImage {
-                base_image: self.clone(),
-                image: image_loading_result.unwrap(),
-            })
-        } else {
-            error!("Failed to load base image: {}", self.path);
-            Err(())
+        match image_loading_result {
+            Ok(loaded_image) => {
+                Ok(
+                    BaseImageWithImage {
+                        base_image: self.clone(),
+                        image: loaded_image,
+                    }
+                )
+            },
+            Err(_) => {
+                error!("Failed to load base image: {}", self.path);
+                Err(())
+            }
         }
     }
 }
