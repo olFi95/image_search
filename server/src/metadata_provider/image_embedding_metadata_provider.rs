@@ -1,7 +1,7 @@
 use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
-use clip::ImageEmbedder;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
+use ai_models::image_embedder::ImageEmbedder;
 
 pub struct ImageEmbeddingMetadataProvider {
     image_embedder: ImageEmbedder,

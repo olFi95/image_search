@@ -1,5 +1,5 @@
 [workspace]
-members = ["client", "clip", "data", "face_detection", "server", "onnx_updater"]
+members = ["client", "data", "ai_models", "server", "onnx_updater"]
 resolver = "3"
 default-members = ["server"]
 

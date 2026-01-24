@@ -99,6 +99,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai_models"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "burn",
+ "burn-import",
+ "burn-store",
+ "hf-hub",
+ "image",
+ "onnx_updater",
+]
+
+[[package]]
 name = "aligned"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2407,18 +2420,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clip"
-version = "0.1.0"
-dependencies = [
- "burn",
- "burn-import",
- "burn-store",
- "hf-hub",
- "image",
- "onnx_updater",
-]
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4218,19 +4219,6 @@ dependencies = [
  "rmp-serde",
  "serde",
  "tempfile",
-]
-
-[[package]]
-name = "face_detection"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "burn",
- "burn-import",
- "burn-store",
- "hf-hub",
- "image",
- "onnx_updater",
 ]
 
 [[package]]
@@ -9804,6 +9792,7 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "ai_models",
  "anyhow",
  "axum",
  "axum-server",
@@ -9811,12 +9800,10 @@ dependencies = [
  "burn-wgpu",
  "bytemuck",
  "clap",
- "clip",
  "data",
  "embed_anything",
  "env_logger",
  "expanduser",
- "face_detection",
  "hex",
  "image",
  "log",

@@ -1,8 +1,8 @@
 use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
 use burn_wgpu::Wgpu;
-use face_detection::face_detector::FaceDetector;
-use face_detection::face_embedder::FaceEmbedder;
+use ai_models::face_detector::FaceDetector;
+use ai_models::face_embedder::FaceEmbedder;
 use image::DynamicImage;
 use log::error;
 use serde::{Deserialize, Serialize};

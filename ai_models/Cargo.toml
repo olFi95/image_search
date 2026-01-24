@@ -1,5 +1,5 @@
 [package]
-name = "face_detection"
+name = "ai_models"
 version = "0.1.0"
 edition = "2024"
 
@@ -14,3 +14,10 @@ onnx_updater = { path = "../onnx_updater" }
 anyhow = { workspace = true }
 burn-import = { workspace = true }
 hf-hub = { workspace = true }
+
+[features]
+default = []
+arcface = []
+yolo = []
+age_gender = []
+clip = []

@@ -1,6 +1,6 @@
 use crate::metadata_provider::face_recognition_metadata_provider::FaceInPicture;
 use crate::metadata_provider::metadata_provider::{Metadata, MetadataProvider};
-use face_detection::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
+use ai_models::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
 use log::error;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
