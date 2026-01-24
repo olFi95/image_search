@@ -24,7 +24,7 @@ fn load_arcface(api: &Api) -> anyhow::Result<()> {
     onnx_updater::update(&downloaded_model, &upgraded_model)?;
 
     ModelGen::new()
-        .input(upgraded_model.to_str().unwrap())
+        .input(path_to_os_string(upgraded_model)?.as_str())
         .out_dir("arcface")
         .run_from_script();
     let dest_dir = PathBuf::from("../models");
@@ -47,10 +47,8 @@ fn load_yolo(api: &Api) -> anyhow::Result<()> {
 
     onnx_updater::init()?;
     onnx_updater::update(&downloaded_model, &upgraded_model)?;
-    let upgraded_model_path = upgraded_model.into_os_string().into_string()
-        .map_err(|err| anyhow::anyhow!("Failed to get path for upgraded model: {:?}", err))?;
     ModelGen::new()
-        .input(&upgraded_model_path)
+        .input(path_to_os_string(upgraded_model)?.as_str())
 
         .out_dir("yolo")
         .run_from_script();
@@ -64,6 +62,7 @@ fn load_yolo(api: &Api) -> anyhow::Result<()> {
     )?;
     Ok(())
 }
+
 fn load_age_gender(api: &Api) -> anyhow::Result<()> {
     let repo = api.model("onnx-community/age-gender-prediction-ONNX".to_string());
     let downloaded_model = repo.get("onnx/model.onnx")?;
@@ -76,7 +75,7 @@ fn load_age_gender(api: &Api) -> anyhow::Result<()> {
     onnx_updater::update(&downloaded_model, &upgraded_model)?;
 
     ModelGen::new()
-        .input(upgraded_model.to_str().unwrap())
+        .input(path_to_os_string(upgraded_model)?.as_str())
         .out_dir("age_gender")
         .run_from_script();
     let dest_dir = PathBuf::from("../models");
@@ -88,4 +87,9 @@ fn load_age_gender(api: &Api) -> anyhow::Result<()> {
         PathBuf::from("../models/age_gender.bpk"),
     )?;
     Ok(())
+}
+
+fn path_to_os_string(upgraded_model: PathBuf) -> anyhow::Result<String> {
+    upgraded_model.into_os_string().into_string()
+        .map_err(|err| anyhow::anyhow!("Failed to get path for upgraded model: {:?}", err))
 }
