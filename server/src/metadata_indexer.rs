@@ -101,7 +101,7 @@ impl <C>MetadataIndexer<C> where C: Connection {
                 .await
                 .expect("Inserting base image failed");
 
-            // Now actually load the images. Only continue if the image could be loaded.
+            // Now actually load the images. Drop the Images that were not able to load properly.
             trace!("loading images into {} base_images", &base_images.len());
             let base_images_with_image: Vec<_> = base_images
                 .par_iter()
