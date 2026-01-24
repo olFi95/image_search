@@ -220,8 +220,7 @@ mod tests {
             .iter()
             .cloned()
             .map(|bi| bi.try_into())
-            .filter(|biwi| biwi.is_ok())
-            .map(|biwi| biwi.unwrap())
+            .flat_map(|biwi| biwi.ok())
             .collect();
 
 

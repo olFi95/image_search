@@ -63,8 +63,7 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                     }
                 }
             })
-            .filter(|metadata_result| metadata_result.is_ok())
-            .map(|metadata_result| metadata_result.unwrap())
+            .flat_map(|metadata_result| metadata_result.ok())
             .collect();
 
         Ok(results)
