@@ -4224,6 +4224,7 @@ dependencies = [
 name = "face_detection"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "burn",
  "burn-import",
  "burn-store",

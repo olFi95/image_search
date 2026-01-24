@@ -11,5 +11,6 @@ image = { workspace = true }
 [build-dependencies]
 onnx_updater = { path = "../onnx_updater" }
 
+anyhow = { workspace = true }
 burn-import = { workspace = true }
 hf-hub = { workspace = true }

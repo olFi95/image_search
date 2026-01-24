@@ -1,10 +1,9 @@
 use burn_import::onnx::ModelGen;
 use hf_hub::api::sync::Api;
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> anyhow::Result<()> {
     let api = Api::new()?;
 
     load_arcface(&api)?;
@@ -13,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn load_arcface(api: &Api) -> Result<(), Box<dyn Error>> {
+fn load_arcface(api: &Api) -> anyhow::Result<()> {
     let repo = api.model("garavv/arcface-onnx".to_string());
     let downloaded_model = repo.get("arc.onnx")?;
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
@@ -38,7 +37,7 @@ fn load_arcface(api: &Api) -> Result<(), Box<dyn Error>> {
     )?;
     Ok(())
 }
-fn load_yolo(api: &Api) -> Result<(), Box<dyn Error>> {
+fn load_yolo(api: &Api) -> anyhow::Result<()> {
     let repo = api.model("AdamCodd/YOLOv11n-face-detection".to_string());
     let downloaded_model = repo.get("model.onnx")?;
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
@@ -63,7 +62,7 @@ fn load_yolo(api: &Api) -> Result<(), Box<dyn Error>> {
     )?;
     Ok(())
 }
-fn load_age_gender(api: &Api) -> Result<(), Box<dyn Error>> {
+fn load_age_gender(api: &Api) -> anyhow::Result<()> {
     let repo = api.model("onnx-community/age-gender-prediction-ONNX".to_string());
     let downloaded_model = repo.get("onnx/model.onnx")?;
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
