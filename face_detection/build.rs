@@ -47,9 +47,11 @@ fn load_yolo(api: &Api) -> anyhow::Result<()> {
 
     onnx_updater::init()?;
     onnx_updater::update(&downloaded_model, &upgraded_model)?;
-
+    let upgraded_model_path = upgraded_model.into_os_string().into_string()
+        .map_err(|err| anyhow::anyhow!("Failed to get path for upgraded model: {:?}", err))?;
     ModelGen::new()
-        .input(upgraded_model.to_str().unwrap())
+        .input(&upgraded_model_path)
+
         .out_dir("yolo")
         .run_from_script();
     let dest_dir = PathBuf::from("../models");
