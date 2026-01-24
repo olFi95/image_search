@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn init() -> Result<(), anyhow::Error> {
+pub fn init() -> anyhow::Result<()> {
     // Step 2: Set up Python venv under ./target/venv
     let venv_dir = get_venv_dir()?;
     let pip_path = if cfg!(target_os = "windows") {
@@ -12,7 +12,10 @@ pub fn init() -> Result<(), anyhow::Error> {
 
     println!(
         "pip path {}",
-        pip_path.clone().into_os_string().into_string().unwrap()
+        pip_path.clone()
+            .into_os_string()
+            .into_string()
+            .map_err(|os_string| anyhow::anyhow!("Failed to convert OsString to String: {:?}", os_string))?
     );
     println!("Installing Python dependencies...");
     let status = Command::new(&pip_path)
