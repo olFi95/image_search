@@ -107,8 +107,7 @@ impl <C>MetadataIndexer<C> where C: Connection {
                 .par_iter()
                 .cloned()
                 .map(|bi| bi.try_into())
-                .filter(|biwi| biwi.is_ok())
-                .map(|biwi| biwi.unwrap())
+                .filter_map(Result::ok)
                 .collect();
 
             // Calculate hashes of the image data.
