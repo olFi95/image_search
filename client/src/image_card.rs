@@ -4,7 +4,7 @@ use leptos::prelude::*;
 
 #[component]
 pub fn ImageCard(image: ImageReference, marked_images: RwSignal<Vec<String>>) -> impl IntoView {
-    let (is_open, set_is_open) = signal(false);
+    let is_open = RwSignal::new(false);
     let image_path = image.image_path.clone();
     let image_path_for_click = image_path.clone();
     let image_path_for_checkbox = image_path.clone();
@@ -57,7 +57,7 @@ pub fn ImageCard(image: ImageReference, marked_images: RwSignal<Vec<String>>) ->
                         object-fit: contain;
                         display: block;
                     "
-                    on:click=move |_| set_is_open.set(true)
+                    on:click=move |_| is_open.set(true)
                 />
             </div>
         </div>
@@ -65,7 +65,7 @@ pub fn ImageCard(image: ImageReference, marked_images: RwSignal<Vec<String>>) ->
         <Show when=move || is_open.get() fallback=|| ()>
             <ImageModal
                 image_path=image_path_for_click.clone() // ✅ sicher zu benutzen
-                on_close=move || set_is_open.set(false)
+                is_open
             />
         </Show>
     }

@@ -20,6 +20,7 @@ serde_json = "1.0.149"
 surrealdb = { version = "2.3.7", features = ["kv-mem"] }
 which = "8.0.0"
 leptos = { version = "0.8.6", features = ["csr"] }
+leptos-use = { version = "0.18.0" }
 wasm-bindgen-futures = "0.4.50"
 web-sys = { version = "0.3.77", features = ["MouseEvent", "WheelEvent", "DomRect"] }
 gloo-net = "0.6.0"

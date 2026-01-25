@@ -8,6 +8,7 @@ data = { path = "../data" }
 
 console_error_panic_hook = { workspace = true }
 leptos = { workspace = true }
+leptos-use = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 web-sys = { workspace = true }
 serde_json = { workspace = true }

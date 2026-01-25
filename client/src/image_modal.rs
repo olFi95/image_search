@@ -1,9 +1,12 @@
+use leptos::ev::keydown;
 use leptos::html::Div;
 use leptos::prelude::*;
 use leptos::*;
-use web_sys::{MouseEvent, WheelEvent};
+use leptos_use::{use_event_listener};
+use tracing::trace;
+use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
 #[component]
-pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl IntoView {
+pub fn ImageModal(image_path: String, is_open: RwSignal<bool>) -> impl IntoView {
     let (scale, set_scale) = signal(1.0_f64);
     let (offset, set_offset) = signal((0.0_f64, 0.0_f64));
     let container_ref: NodeRef<Div> = NodeRef::new();
@@ -35,6 +38,7 @@ pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl Int
     let on_mouse_down = move |ev: MouseEvent| {
         ev.prevent_default();
         is_dragging.set(true);
+        trace!("on_mouse_down");
         set_last_mouse_pos.set((ev.client_x() as f64, ev.client_y() as f64));
     };
 
@@ -49,9 +53,33 @@ pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl Int
         }
     };
 
-    let on_mouse_up = move |_: MouseEvent| {
+    let on_mouse_up = move |_ev: MouseEvent| {
         is_dragging.set(false);
+        trace!("on_mouse_up");
     };
+
+    let on_click_close = move |ev: MouseEvent| {
+        if !is_dragging.get() {
+            trace!("On_click called while not dragging");
+            is_open.set(false);
+        } else {
+            // never happens
+            trace!("On_click called when dragging");
+        }
+        ev.stop_propagation();
+    };
+
+    let on_click_close_inner = move |ev: MouseEvent| {
+        trace!("Inner on_click called");
+        ev.stop_propagation();
+    };
+
+    let _ = use_event_listener(document().body(), keydown, move |evt: KeyboardEvent| {
+        if evt.key() == "q" {
+            trace!("Closing modal image");
+            is_open.set(false);
+        }
+    });
 
     view! {
         <div
@@ -64,7 +92,7 @@ pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl Int
                 justify-content: center;
                 z-index: 1000;
             "
-            on:click=move |_| on_close()
+            on:click=on_click_close
         >
             <div
                 node_ref=container_ref
@@ -73,7 +101,7 @@ pub fn ImageModal(image_path: String, on_close: impl Fn() + 'static) -> impl Int
                 on:mousemove=on_mouse_move
                 on:mouseup=on_mouse_up
                 on:mousedown=on_mouse_down
-                on:click:stop_propagation=move |_: MouseEvent| {}
+                on:click=on_click_close_inner
             >
                 <img
                     src=image_path
