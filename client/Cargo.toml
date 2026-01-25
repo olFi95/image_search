@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 data = { path = "../data" }
 
+console_error_panic_hook = { workspace = true }
 leptos = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 web-sys = { workspace = true }
@@ -16,6 +17,9 @@ serde_urlencoded = { workspace = true }
 urlencoding = { workspace = true }
 js-sys = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+tracing-web = { workspace = true }
 
 # use default backend for getrandom
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
