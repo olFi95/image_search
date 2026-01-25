@@ -1,23 +1,25 @@
 #![recursion_limit = "256"]
+use anyhow::Context;
 use crate::clip::init_embedder;
 use crate::database::init_database;
-use crate::search::{web_scan, web_search_text};
+use crate::search::{indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use clap::Parser;
 use embed_anything::embeddings::embed::Embedder;
 use env_logger::Env;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::{Connection, RecordId, Surreal};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 
 mod clip;
 mod database;
+pub mod metadata_indexer;
+pub mod metadata_provider;
 mod search;
 mod server_arguments;
 
@@ -28,9 +30,10 @@ struct DbImage {
 }
 
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppState<C>
+where C:Connection{
     pub arguments: ServerArguments,
-    pub db: Arc<Mutex<Surreal<Client>>>,
+    pub db: Arc<Mutex<Surreal<C>>>,
     pub embedder: Arc<Mutex<Embedder>>,
 }
 
@@ -40,16 +43,21 @@ async fn tokio_main() -> anyhow::Result<()> {
 
     let static_dir = "target/client/dist";
 
+    let surreal_db_client = init_database(&cla).await
+        .context("Failed to initialize surreal db connection!")?;
+    let embedder = init_embedder().await
+        .map_err(anyhow::Error::from_boxed)
+        .context("Failed to initialize embedder!")?;
     let app_state = AppState {
         arguments: cla.clone(),
-        db: Arc::new(Mutex::new(init_database(&cla).await.unwrap())),
-        embedder: Arc::new(Mutex::new(init_embedder().await.unwrap())),
+        db: Arc::new(Mutex::new(surreal_db_client)),
+        embedder: Arc::new(Mutex::new(embedder)),
     };
 
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
         .route("/search", post(web_search_text))
-        .route("/scan", get(web_scan))
+        .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))
         .fallback_service(

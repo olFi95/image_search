@@ -2,7 +2,6 @@ use crate::image_card::ImageCard;
 use data::ImageReference;
 use leptos::control_flow::For;
 use leptos::prelude::*;
-use leptos::*;
 
 #[component]
 pub fn ImageGrid(

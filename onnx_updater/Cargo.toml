@@ -1,0 +1,8 @@
+[package]
+name = "onnx_updater"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+which = { workspace = true }

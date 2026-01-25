@@ -1,20 +1,22 @@
+use data::SearchParams;
 use leptos::prelude::*;
 use leptos::*;
-use data::SearchParams;
 #[component]
 pub fn Header(
     search_term: ReadSignal<String>,
     search_term_set: WriteSignal<String>,
     on_submit: impl Fn(SearchParams) + 'static + Copy,
     on_scan: impl Fn() + 'static + Copy,
-    marked_images: RwSignal::<Vec<String>>,
+    marked_images: RwSignal<Vec<String>>,
 ) -> impl IntoView {
-
     let on_key_down = move |ev: web_sys::KeyboardEvent| {
         if ev.key() == "Enter" {
             let term = search_term.get();
             if !term.trim().is_empty() {
-                on_submit(SearchParams{q: term, referenced_images: marked_images.get().clone()});
+                on_submit(SearchParams {
+                    q: term,
+                    referenced_images: marked_images.get().clone(),
+                });
             }
         }
     };

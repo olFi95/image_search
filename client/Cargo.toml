@@ -4,14 +4,28 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-leptos = { version = "0.8.6", features = ["csr"] }
-wasm-bindgen-futures = "0.4.50"
-web-sys = { version = "0.3.77", features = ["MouseEvent", "WheelEvent", "DomRect"] }
 data = { path = "../data" }
-serde_json = "1.0.143"
-log = "0.4.27"
-gloo-net = "0.6.0"
-serde_urlencoded = "0.7.1"
-urlencoding = "2.1.3"
-js-sys = "0.3.77"
-serde-wasm-bindgen = "0.6.5"
+
+console_error_panic_hook = { workspace = true }
+leptos = { workspace = true }
+leptos-use = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+gloo-net = { workspace = true }
+serde_urlencoded = { workspace = true }
+urlencoding = { workspace = true }
+js-sys = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+tracing-web = { workspace = true }
+
+# use default backend for getrandom
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
+
+# getrandom needs another backend when compiled to wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true, features = ["wasm_js"] }

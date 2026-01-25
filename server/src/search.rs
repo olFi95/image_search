@@ -1,14 +1,17 @@
-use crate::clip::{clip, embed_all_images_in_dir};
+use crate::clip::clip;
+use crate::metadata_indexer::MetadataIndexer;
 use crate::{AppState, DbImage};
-use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{debug_handler, response::IntoResponse};
+use axum::Json;
+use axum::response::IntoResponse;
+use burn_wgpu::WgpuDevice;
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::RecordId;
-use tokio::runtime::Handle;
+use std::sync::Arc;
+use surrealdb::{Connection, RecordId};
+use surrealdb::engine::remote::ws::Client;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -17,10 +20,10 @@ pub struct ImageType {
     pub embedding: Vec<f32>,
 }
 
-pub async fn web_search_text(
-    State(state): State<AppState>,
+pub async fn web_search_text<C>(
+    State(state): State<AppState<C>>,
     Json(params): Json<SearchParams>,
-) -> Result<Json<SearchResponse>, StatusCode> {
+) -> Result<Json<SearchResponse>, StatusCode> where C: Connection{
     debug!("Handle Search with params: {:?}", params);
 
     let db = state.db.lock().await; // oder wie du deine DB-Instanz nutzt
@@ -28,8 +31,14 @@ pub async fn web_search_text(
     let mut query_vector = embedding.clone();
 
     info!("image_paths: {:?}", params.referenced_images);
-    let media_dir = state.arguments.shellexpand_media_dir().expect("media dir could not be loaded");
-    let media_dir_str = media_dir.into_os_string().into_string().expect("media dir could not be converted to string");
+    let media_dir = state
+        .arguments
+        .shellexpand_media_dir()
+        .expect("media dir could not be loaded");
+    let media_dir_str = media_dir
+        .into_os_string()
+        .into_string()
+        .expect("media dir could not be converted to string");
 
     if !params.referenced_images.is_empty() {
         let image_paths: Vec<String> = params
@@ -42,8 +51,14 @@ pub async fn web_search_text(
 
         let mut marked_image_embeddings_response = db
             .query(
-                "
-        SELECT id, image_path, embedding FROM image WHERE image_path IN $image_paths",
+                r#"
+                    SELECT
+                        id,
+                        path AS image_path,
+                        ->has_image_embedding_vector->image_embedding_vector.embedding[0] AS embedding
+                    FROM base_image
+                    WHERE path IN $image_paths
+                "#,
             )
             .bind(("image_paths", image_paths))
             .await
@@ -68,12 +83,20 @@ pub async fn web_search_text(
     }
 
     let query = r#"
+        LET $similar_vectors = (
+            SELECT
+                id,
+                vector::distance::knn() AS similarity
+            FROM image_embedding_vector
+            WHERE embedding <|500|> $reference
+            ORDER BY similarity
+        );
+
         SELECT
-            id,
-            image_path,
-            vector::distance::knn() AS similarity
-        FROM image
-        WHERE embedding <| 1000 |> $reference;
+            similarity,
+            <-has_image_embedding_vector<-base_image[0].id[0] AS id,
+            <-has_image_embedding_vector<-base_image[0].path[0] AS image_path
+        FROM $similar_vectors;
     "#;
 
     let mut response = db
@@ -85,7 +108,7 @@ pub async fn web_search_text(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let db_images: Vec<DbImage> = response.take(0).map_err(|err| {
+    let db_images: Vec<DbImage> = response.take(1).map_err(|err| {
         tracing::error!("Failed to deserialize response: {:?}", err);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -101,28 +124,34 @@ pub async fn web_search_text(
     Ok(Json(SearchResponse { images }))
 }
 
-#[debug_handler]
-pub async fn web_scan(State(state): State<AppState>) -> impl IntoResponse {
-    let state_cloned = state.clone();
+#[axum::debug_handler]
+pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoResponse{
+    let state = state.clone();
 
-    let runtime = Handle::current();
-    let result = runtime.spawn(async move {
-            let result = embed_all_images_in_dir(&state_cloned).await;
-            match result {
-                Ok(_) => info!("embedded all images successfully."),
-                Err(e) => {
-                    error!("Error embedding images: {}", e);
-                }
-            }
-        })
-        .await;
+    tokio::task::spawn_blocking(move || {
+        // ❗ alles Nicht-Send hier rein
+        let rt = tokio::runtime::Handle::current();
 
-    match result {
-        Ok(_) => info!("Image embedding task completed."),
-        Err(e) => error!("Failed to join image embedding task: {}", e),
-    }
+        rt.block_on(async {
+            let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
 
-    StatusCode::OK
+            let metadata_indexer = MetadataIndexer::new(
+                state.db.lock().await.clone(),
+                device,
+                state.arguments.arcface_model_weights.clone(),
+                state.arguments.yolo_model_weights.clone(),
+                state.arguments.clip_model_weights.clone(),
+                state.arguments.age_and_gender_model_weights.clone(),
+            );
+
+            metadata_indexer
+                .index_metadata(state.arguments.shellexpand_media_dir().expect("media dir"))
+                .await
+                .expect("indexing failed");
+        });
+    });
+
+    StatusCode::ACCEPTED
 }
 fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
     assert!(!vectors.is_empty(), "Input must not be empty");
@@ -156,7 +185,7 @@ mod tests {
     fn tes_average_vector() {
         let a = vec![1.0, 2.0, 4.0, 4.0, 10.0];
         let b = vec![1.0, 1.0, 2.0, 4.0, 0.0];
-        let result = average_slices(&vec![a.as_slice(), b.as_slice()]);
+        let result = average_slices(&vec![&a, &b]);
         assert_eq!(result, vec![1.0, 1.5, 3.0, 4.0, 5.0]);
     }
 }
