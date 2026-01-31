@@ -1,7 +1,6 @@
 use crate::age_gender;
 use burn::backend::Wgpu;
-use burn::prelude::{Device, TensorData};
-use burn::Tensor;
+use burn::prelude::Device;
 use image::DynamicImage;
 use std::sync::Arc;
 use crate::utils::preprocess_clip;

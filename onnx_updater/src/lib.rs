@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn init() -> anyhow::Result<()> {
@@ -57,7 +57,7 @@ pub fn get_venv_dir() -> Result<PathBuf, anyhow::Error> {
     Ok(venv_dir)
 }
 
-pub fn update(input_model: &PathBuf, output_model: &PathBuf) -> Result<(), anyhow::Error> {
+pub fn update(input_model: &Path, output_model: &Path) -> Result<(), anyhow::Error> {
     let venv_dir = get_venv_dir()?;
     let python_path = if cfg!(target_os = "windows") {
         venv_dir.join("Scripts/python.exe")

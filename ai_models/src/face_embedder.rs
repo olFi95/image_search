@@ -36,7 +36,7 @@ impl FaceEmbedder {
     pub fn preprocess_arcface(img: &DynamicImage) -> Tensor<Wgpu, 4> {
         let img = img.resize_exact(112, 112, image::imageops::FilterType::Triangle);
         let rgb = img.to_rgb8();
-        let mut data = Vec::with_capacity(1 * 112 * 112 * 3);
+        let mut data = Vec::with_capacity(112 * 112 * 3);
 
         // NHWC: N=1
         for y in 0..112 {

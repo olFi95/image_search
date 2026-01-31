@@ -21,7 +21,7 @@ pub async fn init_embedder() -> Result<Embedder, Box<dyn std::error::Error + Sen
 }
 
 pub fn get_all_directories_in_dir(media_dir: &PathBuf) -> Vec<String> {
-    let all_image_paths: Vec<String> = WalkDir::new(&media_dir)
+    let all_image_paths: Vec<String> = WalkDir::new(media_dir)
         .follow_links(true)
         .into_iter()
         .filter_map(|entry| {

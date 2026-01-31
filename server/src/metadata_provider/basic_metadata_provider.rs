@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{
+use crate::metadata_provider::model::{
     BaseImageWithImage, Metadata, MetadataProvider,
 };
 use log::error;
@@ -33,11 +33,9 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
 
                 match metadata_result {
                     Ok(metadata) => {
-                        let file_extension =
-                            match PathBuf::from(&base_image.base_image.path).extension() {
-                                Some(ext) => Some(ext.to_string_lossy().to_string()),
-                                None => None,
-                            };
+                        let file_extension = PathBuf::from(&base_image.base_image.path)
+                            .extension()
+                            .map(|ext| ext.to_string_lossy().to_string());
 
                         Ok(Metadata {
                             id: None,
@@ -46,10 +44,7 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                                 height: base_image.image.height(),
                                 width: base_image.image.width(),
                                 size_in_bytes: metadata.len(),
-                                created: match metadata.created() {
-                                    Ok(time) => Some(time),
-                                    Err(_) => None,
-                                },
+                                created: metadata.created().ok(),
                             }),
                             base: base_image.base_image.id.clone(),
                         })

@@ -14,7 +14,7 @@ use crate::metadata_provider::image_embedding_metadata_provider::{
 use crate::metadata_provider::image_hash_metadata_provider::{
     ImageHashMetadataProvider, ImageHashMetadataRepository,
 };
-use crate::metadata_provider::metadata_provider::{
+use crate::metadata_provider::model::{
     BaseImage, BaseImageRepository, MetadataProvider,
 };
 use burn::tensor::Device;
@@ -215,7 +215,7 @@ impl <C>MetadataIndexer<C> where C: Connection {
 #[cfg(test)]
 mod test {
     use crate::metadata_indexer::MetadataIndexer;
-    use crate::metadata_provider::metadata_provider::BaseImageRepository;
+    use crate::metadata_provider::model::BaseImageRepository;
     use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
 
     #[test]

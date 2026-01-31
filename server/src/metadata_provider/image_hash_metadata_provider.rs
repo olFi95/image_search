@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{
+use crate::metadata_provider::model::{
     BaseImage, BaseImageWithImage, Metadata, MetadataProvider,
 };
 use log::error;
@@ -160,7 +160,7 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata_provider::metadata_provider::{BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider};
+    use crate::metadata_provider::model::{BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider};
     use image::{ColorType, DynamicImage};
     use std::path::PathBuf;
     use surrealdb::engine::local::Mem;

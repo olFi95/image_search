@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use burn::backend::Wgpu;
-use burn::prelude::{Device, TensorData};
-use burn::Tensor;
+use burn::prelude::Device;
 use image::DynamicImage;
 use crate::clip;
 use crate::utils::preprocess_clip;
@@ -22,7 +21,7 @@ impl ImageEmbedder {
         }
     }
     pub fn embed(&self, image: &DynamicImage) -> Vec<f32> {
-        let preprocessed_image = preprocess_clip(&image);
+        let preprocessed_image = preprocess_clip(image);
         let embedding = self.model.forward(preprocessed_image);
         let embedding = embedding.reshape([768]);
         let norm = (embedding.clone() * embedding.clone()).sum().sqrt();

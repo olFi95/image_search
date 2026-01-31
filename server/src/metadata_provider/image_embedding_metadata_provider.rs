@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
+use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
 use ai_models::image_embedder::ImageEmbedder;
@@ -33,7 +33,7 @@ impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMeta
             let embedding = self.image_embedder.embed(&image.image);
             results.push(Metadata {
                 id: None,
-                metadata: Some(ImageEmbedding { embedding: embedding }),
+                metadata: Some(ImageEmbedding { embedding }),
                 base: Some(image.base_image.id.clone().unwrap()),
             });
         }

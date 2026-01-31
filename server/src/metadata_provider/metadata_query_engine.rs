@@ -3,7 +3,7 @@ use crate::metadata_provider::basic_metadata_provider::BasicMetadata;
 use crate::metadata_provider::face_recognition_metadata_provider::FaceInPictureVector;
 use crate::metadata_provider::image_embedding_metadata_provider::ImageEmbedding;
 use crate::metadata_provider::image_hash_metadata_provider::ImageHashMetadata;
-use crate::metadata_provider::metadata_provider::BaseImage;
+use crate::metadata_provider::model::BaseImage;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, RecordId, Surreal};
 

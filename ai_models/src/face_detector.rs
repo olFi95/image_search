@@ -42,8 +42,8 @@ impl FaceDetector {
         for anchor in 0..num_anchors {
             let offset = base * stride_batch + anchor;
 
-            let x = data_slice[offset + 0 * stride_attr];
-            let y = data_slice[offset + 1 * stride_attr];
+            let x = data_slice[offset];  // + 0 * stride_attr
+            let y = data_slice[offset + stride_attr];  // + 1 * stride_attr
             let w = data_slice[offset + 2 * stride_attr];
             let h = data_slice[offset + 3 * stride_attr];
             let conf = data_slice[offset + 4 * stride_attr];

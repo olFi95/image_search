@@ -21,6 +21,8 @@ pub mod yolo {
     include!(concat!(env!("OUT_DIR"), "/yolo/yolo.rs"));
 }
 #[cfg(feature = "age_gender")]
+// It's not great but the warning is annoying and not directly related to the code in this repository
+#[allow(clippy::eq_op)]
 #[allow(warnings)]
 pub mod age_gender {
     include!(concat!(env!("OUT_DIR"), "/age_gender/age_gender.rs"));

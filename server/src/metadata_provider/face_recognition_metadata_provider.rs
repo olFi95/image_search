@@ -1,4 +1,4 @@
-use crate::metadata_provider::metadata_provider::{BaseImageWithImage, Metadata, MetadataProvider};
+use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
 use burn_wgpu::Wgpu;
 use ai_models::face_detector::FaceDetector;
