@@ -27,6 +27,7 @@ serde = { workspace = true }
 clap = { workspace = true }
 surrealdb = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "ansi", "tracing-log"] }
 embed_anything = { workspace = true }
 walkdir = { workspace = true }
 urlencoding = { workspace = true }

@@ -8,13 +8,13 @@ use axum::routing::post;
 use axum::{Router, routing::get};
 use clap::Parser;
 use embed_anything::embeddings::embed::Embedder;
-use env_logger::Env;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use surrealdb::{Connection, RecordId, Surreal};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
+use tracing_subscriber::EnvFilter;
 
 mod clip;
 mod database;
@@ -37,8 +37,26 @@ where C:Connection{
     pub embedder: Arc<Mutex<Embedder>>,
 }
 
+fn init_logging() -> anyhow::Result<()> {
+    let default_level = tracing::Level::WARN.to_string();
+    let package_log_level = tracing::Level::TRACE.to_string();
+    let package_name = env!("CARGO_CRATE_NAME");
+    let log_directive = format!("{default_level},{package_name}={package_log_level}");
+    eprintln!("Using log directive: {}", log_directive);
+
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_env_filter(
+            EnvFilter::builder()  // respect RUST_LOG environment variable
+                // set default log level of this package to individual level
+                .parse(log_directive)?
+        )
+        .init();
+    Ok(())
+}
+
 async fn tokio_main() -> anyhow::Result<()> {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    init_logging()?;
     let cla = ServerArguments::parse();
 
     let static_dir = "target/client/dist";
