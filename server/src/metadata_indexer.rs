@@ -17,6 +17,7 @@ use crate::metadata_provider::image_hash_metadata_provider::{
 use crate::metadata_provider::metadata_provider::{
     BaseImage, BaseImageRepository, MetadataProvider,
 };
+use crate::toast::Toaster;
 use burn::tensor::Device;
 use burn_wgpu::Wgpu;
 use log::{info, trace};
@@ -200,6 +201,16 @@ impl <C>MetadataIndexer<C> where C: Connection {
             "Finished indexing metadata for images in {}. Rebuilding indexes now.",
             path.to_str().unwrap_or("provided path")
         );
+        Toaster::toast(
+            None,
+            "Indexing Complete",
+            format!(
+                "Finished indexing metadata for images in {}. Rebuilding indexes now.",
+                path.to_str().unwrap_or("provided path")
+            )
+            .as_str(),
+            false,
+        ).await.expect("cannot send toast");
         image_embedding_metadata_repository
             .rebuild_index()
             .await
@@ -208,6 +219,13 @@ impl <C>MetadataIndexer<C> where C: Connection {
             "Finished rebuilding indexes of metadata in {}.",
             path.to_str().unwrap_or("provided path")
         );
+        Toaster::toast(
+            None,
+            "Rebuilding indexes Complete",
+            "Finished rebuilding indexes.",
+            false,
+        ).await.expect("cannot send toast");
+
         Ok(())
     }
 }

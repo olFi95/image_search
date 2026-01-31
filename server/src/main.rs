@@ -22,6 +22,7 @@ pub mod metadata_indexer;
 pub mod metadata_provider;
 mod search;
 mod server_arguments;
+mod toast;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DbImage {

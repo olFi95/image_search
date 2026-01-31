@@ -14,31 +14,27 @@ data = { path = "../data" }
 ai_models = { path = "../ai_models" , features = ["yolo","age_gender", "arcface", "clip"] }
 
 axum = { workspace = true }
-tonic = { workspace = true }
-tonic-web = { workspace = true }
 tokio = { workspace = true }
 tower-http = { workspace = true }
 axum-server = { workspace = true }
 env_logger = { workspace = true }
 expanduser = { workspace = true }
 log = { workspace = true }
-serde_json = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 surrealdb = { workspace = true }
 tracing = { workspace = true }
 embed_anything = { workspace = true }
 walkdir = { workspace = true }
-urlencoding = { workspace = true }
-rand = { workspace = true }
 burn = { workspace = true }
 burn-wgpu = { workspace = true }
 image = { workspace = true }
 rayon = { workspace = true }
-bytemuck = { workspace = true }
 anyhow = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+zbus = {workspace = true}
+zvariant = {workspace = true}
 
 [profile.dev]
 opt-level = 1               # Use slightly better optimizations, reduces debug build size

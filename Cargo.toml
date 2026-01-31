@@ -46,3 +46,5 @@ rayon = "1.11.0"
 bytemuck = "1.23.2"
 sha2 = "0.10.9"
 hex = "0.4.3"
+zbus = {version= "5.13.2", features=[]}
+zvariant = "5.9.2"
