@@ -4,21 +4,20 @@ use burn::backend::Wgpu;
 use burn::backend::wgpu::WgpuDevice;
 use burn::prelude::Device;
 use image::DynamicImage;
-use std::sync::Arc;
 
 pub struct FaceEmbedder {
-    pub model: Arc<Box<arcface::Model<Wgpu>>>,
-    pub device: Arc<Box<Device<Wgpu>>>,
+    pub model: Box<arcface::Model<Wgpu>>,
+    pub device: Device<Wgpu>,
 }
 
 impl FaceEmbedder {
-    pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
+    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
         let model = Box::new(arcface::Model::from_file(
             model_path,
-            device.as_ref().as_ref(),
+            &device,
         ));
         FaceEmbedder {
-            model: Arc::new(model),
+            model,
             device,
         }
     }
@@ -68,22 +67,22 @@ mod tests {
 
     #[test]
     fn embed_all_faces_of_group_photo() {
-        let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
+        let device = WgpuDevice::DefaultDevice;
 
         let face_detector = {
             let model: yolo::Model<Wgpu> =
-                yolo::Model::from_file("../models/yolo.bpk", device.as_ref().as_ref());
+                yolo::Model::from_file("../models/yolo.bpk", &device);
             FaceDetector {
-                model: Arc::new(Box::new(model)),
+                model: Box::new(model),
                 device: device.clone(),
             }
         };
         let face_embedder = {
             let model: arcface::Model<Wgpu> =
-                arcface::Model::from_file("../models/arcface_model.bpk", device.as_ref().as_ref());
+                arcface::Model::from_file("../models/arcface_model.bpk", &device);
             FaceEmbedder {
-                model: Arc::new(Box::new(model)),
-                device: device.clone(),
+                model: Box::new(model),
+                device,
             }
         };
 

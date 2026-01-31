@@ -1,7 +1,9 @@
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
+use ai_models::image_embedder::ImageEmbedder;
+use burn::prelude::Device;
+use burn::backend::Wgpu;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
-use ai_models::image_embedder::ImageEmbedder;
 
 pub struct ImageEmbeddingMetadataProvider {
     image_embedder: ImageEmbedder,
@@ -9,7 +11,7 @@ pub struct ImageEmbeddingMetadataProvider {
 
 impl ImageEmbeddingMetadataProvider {
     pub fn new(
-        device: std::sync::Arc<Box<burn::tensor::Device<burn_wgpu::Wgpu>>>,
+        device: Device<Wgpu>,
         image_embedder: &str,
     ) -> Self {
         Self {

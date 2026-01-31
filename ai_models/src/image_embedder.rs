@@ -1,22 +1,22 @@
-use std::sync::Arc;
+use crate::clip;
+use crate::utils::preprocess_clip;
+use burn::backend::wgpu::WgpuDevice;
 use burn::backend::Wgpu;
 use burn::prelude::Device;
 use image::DynamicImage;
-use crate::clip;
-use crate::utils::preprocess_clip;
 
 pub struct ImageEmbedder {
-    pub model: Arc<Box<clip::Model<Wgpu>>>,
-    pub device: Arc<Box<Device<Wgpu>>>,
+    pub model: Box<clip::Model<Wgpu>>,
+    pub device: Device<Wgpu>,
 }
 impl ImageEmbedder {
-    pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
+    pub fn new(model_path: &str, device: WgpuDevice) -> Self {
         let model = Box::new(clip::Model::from_file(
             model_path,
-            device.as_ref().as_ref(),
+            &device,
         ));
         ImageEmbedder {
-            model: Arc::new(model),
+            model,
             device,
         }
     }

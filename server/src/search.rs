@@ -9,7 +9,6 @@ use burn_wgpu::WgpuDevice;
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use surrealdb::{Connection, RecordId};
 use surrealdb::engine::remote::ws::Client;
 
@@ -133,11 +132,9 @@ pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoRespons
         let rt = tokio::runtime::Handle::current();
 
         rt.block_on(async {
-            let device = Arc::new(Box::new(WgpuDevice::DefaultDevice));
-
             let metadata_indexer = MetadataIndexer::new(
                 state.db.lock().await.clone(),
-                device,
+                WgpuDevice::DefaultDevice,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
                 state.arguments.clip_model_weights.clone(),

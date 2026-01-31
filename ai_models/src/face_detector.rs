@@ -1,20 +1,20 @@
 use crate::yolo;
-use burn::Tensor;
+use burn::backend::wgpu::WgpuDevice;
 use burn::backend::Wgpu;
 use burn::prelude::{Device, TensorData};
+use burn::Tensor;
 use image::DynamicImage;
-use std::sync::Arc;
 
 pub struct FaceDetector {
-    pub model: Arc<Box<yolo::Model<Wgpu>>>,
-    pub device: Arc<Box<Device<Wgpu>>>,
+    pub model: Box<yolo::Model<Wgpu>>,
+    pub device: Device<Wgpu>,
 }
 
 impl FaceDetector {
-    pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
-        let model = Box::new(yolo::Model::from_file(model_path, device.as_ref().as_ref()));
+    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
+        let model = Box::new(yolo::Model::from_file(model_path, &device));
         FaceDetector {
-            model: Arc::new(model),
+            model,
             device,
         }
     }
@@ -113,7 +113,7 @@ pub fn scale_image<const HEIGHT: u32, const WIDTH: u32>(image: DynamicImage) -> 
         base_y: image.height(),
     }
 }
-fn image_to_tensor(image: &image::DynamicImage, device: &Device<Wgpu>) -> Tensor<Wgpu, 4> {
+fn image_to_tensor(image: &DynamicImage, device: &WgpuDevice) -> Tensor<Wgpu, 4> {
     let rgb = image.to_rgb8();
     let (width, height) = rgb.dimensions();
 
@@ -176,8 +176,8 @@ pub struct BBox {
 mod tests {
     use crate::face_detector::FaceDetector;
     use crate::yolo;
-    use burn::backend::Wgpu;
     use burn::backend::wgpu::WgpuDevice;
+    use burn::backend::Wgpu;
     use image::open;
     use std::sync::Arc;
 
@@ -186,8 +186,8 @@ mod tests {
         let device = WgpuDevice::DefaultDevice;
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
         let face_detector = FaceDetector {
-            model: Arc::new(Box::new(model)),
-            device: Arc::new(Box::new(device)),
+            model: Box::new(model),
+            device,
         };
 
         let image = open("../../test_pictures/pexels-fauxels-3184398.jpg").expect("Failed to open image");
@@ -201,8 +201,8 @@ mod tests {
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
 
         let face_detector = FaceDetector {
-            model: Arc::new(Box::new(model)),
-            device: Arc::new(Box::new(device)),
+            model: Box::new(model),
+            device,
         };
 
         let image =
@@ -217,8 +217,8 @@ mod tests {
         let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
 
         let face_detector = FaceDetector {
-            model: Arc::new(Box::new(model)),
-            device: Arc::new(Box::new(device)),
+            model: Box::new(model),
+            device,
         };
 
         let image = open(

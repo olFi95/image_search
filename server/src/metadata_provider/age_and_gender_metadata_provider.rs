@@ -1,3 +1,5 @@
+use burn::prelude::Device;
+use burn_wgpu::Wgpu;
 use crate::metadata_provider::face_recognition_metadata_provider::FaceInPicture;
 use crate::metadata_provider::model::{Metadata, MetadataProvider};
 use ai_models::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
@@ -17,7 +19,7 @@ pub struct AgeAndGenderMetadataProvider {
 
 impl AgeAndGenderMetadataProvider {
     pub fn new(
-        device: std::sync::Arc<Box<burn::tensor::Device<burn_wgpu::Wgpu>>>,
+        device: Device<Wgpu>,
         age_and_gender_model: &str,
     ) -> Self {
         Self {

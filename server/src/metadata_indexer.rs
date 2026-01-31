@@ -23,12 +23,11 @@ use log::{info, trace};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
-use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 
 pub struct MetadataIndexer<C> where C: Connection {
     db: Surreal<C>,
-    device: Arc<Box<Device<Wgpu>>>,
+    device: Device<Wgpu>,
     face_detector: String,
     face_embedder: String,
     face_age_and_gender: String,
@@ -38,7 +37,7 @@ pub struct MetadataIndexer<C> where C: Connection {
 impl <C>MetadataIndexer<C> where C: Connection {
     pub fn new(
         db: Surreal<C>,
-        device: Arc<Box<Device<Wgpu>>>,
+        device: Device<Wgpu>,
         face_embedder: String,
         face_detector: String,
         image_embedder: String,
@@ -242,7 +241,7 @@ mod test {
 
                     let metadata_indexer = MetadataIndexer::new(
                         db.clone(),
-                        Arc::new(Box::new(WgpuDevice::DefaultDevice)),
+                        WgpuDevice::DefaultDevice,
                         "../models/arcface_model.bpk".to_string(),
                         "../models/yolo.bpk".to_string(),
                         "../models/vision_model.bpk".to_string(),

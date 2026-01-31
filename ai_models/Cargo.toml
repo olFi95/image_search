@@ -7,6 +7,7 @@ edition = "2024"
 burn = { workspace = true }
 burn-store = { workspace = true }
 image = { workspace = true }
+tokio = { workspace = true }
 
 [build-dependencies]
 onnx_updater = { path = "../onnx_updater" }

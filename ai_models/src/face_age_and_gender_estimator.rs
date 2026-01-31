@@ -2,21 +2,20 @@ use crate::age_gender;
 use burn::backend::Wgpu;
 use burn::prelude::Device;
 use image::DynamicImage;
-use std::sync::Arc;
 use crate::utils::preprocess_clip;
 
 pub struct FaceAgeAndGenderEstimator {
-    pub model: Arc<Box<age_gender::Model<Wgpu>>>,
-    pub device: Arc<Box<Device<Wgpu>>>,
+    pub model: Box<age_gender::Model<Wgpu>>,
+    pub device: Device<Wgpu>,
 }
 impl FaceAgeAndGenderEstimator {
-    pub fn new(model_path: &str, device: Arc<Box<Device<Wgpu>>>) -> Self {
+    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
         let model = Box::new(age_gender::Model::from_file(
             model_path,
-            device.as_ref().as_ref(),
+            &device,
         ));
         Self {
-            model: Arc::new(model),
+            model,
             device,
         }
     }

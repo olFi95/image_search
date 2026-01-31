@@ -6,7 +6,6 @@ use ai_models::face_embedder::FaceEmbedder;
 use image::DynamicImage;
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 
 pub struct FaceRecognitionMetadataProvider {
@@ -15,7 +14,7 @@ pub struct FaceRecognitionMetadataProvider {
 }
 
 impl FaceRecognitionMetadataProvider {
-    pub fn new(device: Arc<Box<Device<Wgpu>>>, face_detector: &str, face_embedder: &str) -> Self {
+    pub fn new(device: Device<Wgpu>, face_detector: &str, face_embedder: &str) -> Self {
         Self {
             face_detector: FaceDetector::new(face_detector, device.clone()),
             face_embedder: FaceEmbedder::new(face_embedder, device),
