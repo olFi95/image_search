@@ -58,7 +58,7 @@ pub struct Metadata<M> {
 }
 
 pub trait MetadataProvider<B, M> {
-    fn extract(&self, base_data_elements: &Vec<B>) -> anyhow::Result<Vec<Metadata<M>>>;
+    fn extract(&self, base_data_elements: &[B]) -> anyhow::Result<Vec<Metadata<M>>>;
 }
 
 pub struct BaseImageRepository<C: Connection> {

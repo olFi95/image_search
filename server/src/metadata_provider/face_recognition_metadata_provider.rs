@@ -47,7 +47,7 @@ static FACE_IN_PICTURE_VECTOR_RELATION_NAME: &str = "has_face_in_picture_vector"
 impl MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMetadataProvider {
     fn extract(
         &self,
-        base_images: &Vec<BaseImageWithImage>,
+        base_images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
         let mut results: Vec<Metadata<FaceInPicture>> = vec![];
         for base_image in base_images {
@@ -77,7 +77,7 @@ impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
 {
     fn extract(
         &self,
-        face_in_picture: &Vec<Metadata<FaceInPicture>>,
+        face_in_picture: &[Metadata<FaceInPicture>],
     ) -> anyhow::Result<Vec<Metadata<FaceInPictureVector>>> {
         let mut results: Vec<Metadata<FaceInPictureVector>> = vec![];
         for face_in_picture_metadata in face_in_picture {

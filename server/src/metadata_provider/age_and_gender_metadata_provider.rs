@@ -32,7 +32,7 @@ impl AgeAndGenderMetadataProvider {
 impl MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for AgeAndGenderMetadataProvider {
     fn extract(
         &self,
-        face_in_picture: &Vec<Metadata<FaceInPicture>>,
+        face_in_picture: &[Metadata<FaceInPicture>],
     ) -> anyhow::Result<Vec<Metadata<FaceAgeAndGender>>> {
         let mut results: Vec<Metadata<FaceAgeAndGender>> = vec![];
         for face_in_picture_metadata in face_in_picture {

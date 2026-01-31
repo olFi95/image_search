@@ -24,7 +24,7 @@ pub struct BasicMetadata {
 impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvider {
     fn extract(
         &self,
-        base_images: &Vec<BaseImageWithImage>,
+        base_images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
         let results: Vec<Metadata<BasicMetadata>> = base_images
             .par_iter()

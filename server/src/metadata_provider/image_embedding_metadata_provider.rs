@@ -26,7 +26,7 @@ pub struct ImageEmbedding {
 impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider {
     fn extract(
         &self,
-        images: &Vec<BaseImageWithImage>,
+        images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
         let mut results: Vec<Metadata<ImageEmbedding>> = vec![];
         for image in images {

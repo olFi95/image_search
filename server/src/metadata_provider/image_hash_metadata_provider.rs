@@ -19,7 +19,7 @@ pub struct ImageHashMetadata {
 impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetadataProvider {
     fn extract(
         &self,
-        base_images: &Vec<BaseImageWithImage>,
+        base_images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
         // Parallel über die Bilder iterieren
         let results: Vec<Metadata<ImageHashMetadata>> = base_images
