@@ -42,15 +42,18 @@ fn init_logging() -> anyhow::Result<()> {
     let package_log_level = tracing::Level::TRACE.to_string();
     let package_name = env!("CARGO_CRATE_NAME");
     let log_directive = format!("{default_level},{package_name}={package_log_level}");
-    eprintln!("Using log directive: {}", log_directive);
-
+    // respect RUST_LOG environment variable
+    let env_filter = match std::env::var("RUST_LOG") {
+        Ok(env) => {
+            EnvFilter::builder().parse(env)?
+        }
+        Err(_) => {
+            EnvFilter::builder().parse(log_directive)?
+        }
+    };
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
-        .with_env_filter(
-            EnvFilter::builder()  // respect RUST_LOG environment variable
-                // set default log level of this package to individual level
-                .parse(log_directive)?
-        )
+        .with_env_filter(env_filter)
         .init();
     Ok(())
 }
