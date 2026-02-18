@@ -5,3 +5,4 @@ pub mod image_embedding_metadata_provider;
 pub mod image_hash_metadata_provider;
 pub mod model;
 pub mod metadata_query_engine;
+pub mod exif_metadata_provider;

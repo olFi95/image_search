@@ -34,12 +34,14 @@ urlencoding = { workspace = true }
 rand = { workspace = true }
 burn = { workspace = true }
 burn-wgpu = { workspace = true }
-image = { workspace = true }
+image = { workspace = true, features = ["serde"] }
 rayon = { workspace = true }
 bytemuck = { workspace = true }
 anyhow = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+nom-exif = { workspace = true }
+chrono = "0.4.43"
 
 [profile.dev]
 opt-level = 1               # Use slightly better optimizations, reduces debug build size

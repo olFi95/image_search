@@ -24,6 +24,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
 use surrealdb::{Connection, Surreal};
+use crate::metadata_provider::exif_metadata_provider::{ExifMetadataProvider, ExifMetadataRepository};
 
 pub struct MetadataIndexer<C> where C: Connection {
     db: Surreal<C>,
@@ -57,6 +58,7 @@ impl <C>MetadataIndexer<C> where C: Connection {
         // Metadata Provider
         let image_hash_metadata_provider = ImageHashMetadataProvider;
         let basic_metadata_provider = BasicMetadataProvider;
+        let exif_metadata_provider = ExifMetadataProvider;
         let face_recognition_metadata_provider = FaceRecognitionMetadataProvider::new(
             self.device.clone(),
             self.face_detector.as_str(),
@@ -72,6 +74,7 @@ impl <C>MetadataIndexer<C> where C: Connection {
         let image_hash_metadata_repository =
             ImageHashMetadataRepository::new(self.db.clone()).await;
         let basic_metadata_repository = BasicMetadataRepository::new(self.db.clone()).await;
+        let exif_metadata_repository = ExifMetadataRepository::new(self.db.clone()).await;
         let face_recognition_metadata_repository =
             FaceRecognitionMetadataRepository::new(self.db.clone()).await;
         let face_age_and_gender_metadata_repository =
@@ -140,6 +143,16 @@ impl <C>MetadataIndexer<C> where C: Connection {
                 .insert_many(&basic_metadata)
                 .await
                 .expect("could not save hashes");
+
+            // Read exif metadata
+            trace!("Reading exif metadata");
+            let exif_metadata = exif_metadata_provider
+                .extract(&base_images_with_image)
+                .expect("cannot extract exif metadata");
+            exif_metadata_repository
+                .insert_many(&exif_metadata)
+                .await
+                .expect("could not save exif metadata");
 
             // Run face recognition on images.
             trace!(

@@ -27,6 +27,7 @@ gloo-net = "0.6.0"
 serde_urlencoded = "0.7.1"
 urlencoding = "2.1.3"
 js-sys = "0.3.77"
+nom-exif = "2.7.0"
 serde-wasm-bindgen = "0.6.5"
 getrandom = { version = "0.3.4" }
 clap = { version = "4.5.45", features = ["derive"] }
