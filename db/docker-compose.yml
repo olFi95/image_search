@@ -1,0 +1,18 @@
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v3
+    container_name: surrealdb
+    # see https://github.com/surrealdb/surrealdb/issues/6317
+    # and https://github.com/surrealdb/surrealdb/blob/main/docker/DOCKER.md
+    command: start surrealkv://home/nonroot
+    ports:
+      - 8000:8000
+    volumes:
+      - surrealdb_data:/home/nonroot
+    environment:
+      - SURREAL_LOG=info
+      - SURREAL_USER=root
+      - SURREAL_PASS=root # Change this in production!
+
+volumes:
+  surrealdb_data:
