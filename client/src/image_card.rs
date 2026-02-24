@@ -11,7 +11,7 @@ pub fn ImageCard(image: ImageReference, marked_images: RwSignal<Vec<String>>) ->
     let checkbox_click = {
         move |_| {
             let mut current = marked_images.get();
-            let already_marked = current.iter().any(|m| *m == image_path_for_checkbox);
+            let already_marked = current.contains(&image_path_for_checkbox);
 
             if already_marked {
                 // Entfernen

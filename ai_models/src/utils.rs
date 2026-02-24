@@ -1,9 +1,8 @@
-use burn::backend::Wgpu;
-use burn::prelude::TensorData;
+use burn::prelude::{Backend, TensorData};
 use burn::Tensor;
 use image::DynamicImage;
 
-pub fn preprocess_clip(img: &DynamicImage) -> Tensor<Wgpu, 4> {
+pub fn preprocess_clip<B: Backend>(img: &DynamicImage) -> Tensor<B, 4> {
     let resized = img.resize_exact(224, 224, image::imageops::FilterType::CatmullRom);
     let rgb = resized.to_rgb8();
     let pixels = rgb.as_raw().as_slice(); // &[u8] slice in RGBRGBRGB...

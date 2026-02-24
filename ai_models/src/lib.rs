@@ -12,11 +12,13 @@ extern crate alloc;
 
 #[cfg(feature = "arcface")]
 #[allow(warnings)]
+#[allow(clippy::all)]
 pub mod arcface {
     include!(concat!(env!("OUT_DIR"), "/arcface/arc.rs"));
 }
 #[cfg(feature = "yolo")]
 #[allow(warnings)]
+#[allow(clippy::all)]
 pub mod yolo {
     include!(concat!(env!("OUT_DIR"), "/yolo/yolo.rs"));
 }
@@ -24,12 +26,14 @@ pub mod yolo {
 // It's not great but the warning is annoying and not directly related to the code in this repository
 #[allow(clippy::eq_op)]
 #[allow(warnings)]
+#[allow(clippy::all)]
 pub mod age_gender {
     include!(concat!(env!("OUT_DIR"), "/age_gender/age_gender.rs"));
 }
 
 #[cfg(feature = "clip")]
 #[allow(warnings)]
+#[allow(clippy::all)]
 pub mod clip {
     include!(concat!(
     env!("OUT_DIR"),

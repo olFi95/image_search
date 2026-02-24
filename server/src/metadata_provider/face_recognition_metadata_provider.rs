@@ -1,20 +1,20 @@
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
-use burn_wgpu::Wgpu;
 use ai_models::face_detector::FaceDetector;
 use ai_models::face_embedder::FaceEmbedder;
 use image::DynamicImage;
 use log::error;
 use serde::{Deserialize, Serialize};
+use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
 
-pub struct FaceRecognitionMetadataProvider {
-    face_detector: FaceDetector,
-    face_embedder: FaceEmbedder,
+pub struct FaceRecognitionMetadataProvider<B: Backend> {
+    face_detector: FaceDetector<B>,
+    face_embedder: FaceEmbedder<B>,
 }
 
-impl FaceRecognitionMetadataProvider {
-    pub fn new(device: Device<Wgpu>, face_detector: &str, face_embedder: &str) -> Self {
+impl <B>FaceRecognitionMetadataProvider<B> where B: Backend {
+    pub fn new(device: Device<B>, face_detector: &str, face_embedder: &str) -> Self {
         Self {
             face_detector: FaceDetector::new(face_detector, device.clone()),
             face_embedder: FaceEmbedder::new(face_embedder, device),
@@ -43,7 +43,7 @@ static FACE_IN_PICTURE_RELATION_NAME: &str = "has_face_in_picture";
 static FACE_IN_PICTURE_VECTOR_DATA_NAME: &str = "face_in_picture_vector";
 static FACE_IN_PICTURE_VECTOR_RELATION_NAME: &str = "has_face_in_picture_vector";
 
-impl MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMetadataProvider {
+impl<B: Backend> MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMetadataProvider<B> {
     fn extract(
         &self,
         base_images: &[BaseImageWithImage],
@@ -71,8 +71,8 @@ impl MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMeta
         Ok(results)
     }
 }
-impl MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
-    for FaceRecognitionMetadataProvider
+impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
+    for FaceRecognitionMetadataProvider<B>
 {
     fn extract(
         &self,

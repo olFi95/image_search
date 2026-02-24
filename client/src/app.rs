@@ -57,8 +57,8 @@ pub fn App() -> impl IntoView {
 
     let perform_scan = move || {
         spawn_local(async move {
-            let url = format!("/scan");
-            match Request::get(&url).send().await {
+            let url = "/scan";
+            match Request::get(url).send().await {
                 Ok(_) => {}
                 Err(e) => log::error!("Fehler beim Abrufen: {:?}", e),
             }

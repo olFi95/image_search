@@ -18,26 +18,34 @@ use crate::metadata_provider::model::{
     BaseImage, BaseImageRepository, MetadataProvider,
 };
 use burn::tensor::Device;
-use burn_wgpu::Wgpu;
 use log::{info, trace};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
+use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
 
-pub struct MetadataIndexer<C> where C: Connection {
+pub struct MetadataIndexer<C, B>
+where
+    C: Connection,
+    B: Backend,
+{
     db: Surreal<C>,
-    device: Device<Wgpu>,
+    device: Device<B>,
     face_detector: String,
     face_embedder: String,
     face_age_and_gender: String,
     image_embedder: String,
 }
 
-impl <C>MetadataIndexer<C> where C: Connection {
+impl <C, B>MetadataIndexer<C, B>
+where
+    C: Connection,
+    B: Backend,
+{
     pub fn new(
         db: Surreal<C>,
-        device: Device<Wgpu>,
+        device: Device<B>,
         face_embedder: String,
         face_detector: String,
         image_embedder: String,
@@ -57,16 +65,16 @@ impl <C>MetadataIndexer<C> where C: Connection {
         // Metadata Provider
         let image_hash_metadata_provider = ImageHashMetadataProvider;
         let basic_metadata_provider = BasicMetadataProvider;
-        let face_recognition_metadata_provider = FaceRecognitionMetadataProvider::new(
+        let face_recognition_metadata_provider: FaceRecognitionMetadataProvider<B> = FaceRecognitionMetadataProvider::new(
             self.device.clone(),
             self.face_detector.as_str(),
             self.face_embedder.as_str(),
         );
-        let face_age_and_gender_metadata_provider = AgeAndGenderMetadataProvider::new(
+        let face_age_and_gender_metadata_provider: AgeAndGenderMetadataProvider<B> = AgeAndGenderMetadataProvider::new(
             self.device.clone(),
             self.face_age_and_gender.as_str(),
         );
-        let image_embedding_metadata_provider =
+        let image_embedding_metadata_provider: ImageEmbeddingMetadataProvider<B> =
             ImageEmbeddingMetadataProvider::new(self.device.clone(), self.image_embedder.as_str());
         // Metadata Repositories
         let image_hash_metadata_repository =
@@ -231,17 +239,16 @@ mod test {
 
                 rt.block_on(async {
                     use std::path::PathBuf;
-                    use std::sync::Arc;
-                    use burn_wgpu::WgpuDevice;
                     use surrealdb::engine::local::Mem;
                     use surrealdb::Surreal;
+                    use burn_ndarray::{NdArrayDevice, NdArray};
 
                     let db = Surreal::new::<Mem>(()).await.unwrap();
                     db.use_ns("test").use_db("test").await.unwrap();
 
-                    let metadata_indexer = MetadataIndexer::new(
+                    let metadata_indexer = MetadataIndexer::<_, NdArray>::new(
                         db.clone(),
-                        WgpuDevice::DefaultDevice,
+                        NdArrayDevice::default(),
                         "../models/arcface_model.bpk".to_string(),
                         "../models/yolo.bpk".to_string(),
                         "../models/vision_model.bpk".to_string(),

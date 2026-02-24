@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
-use burn_wgpu::WgpuDevice;
+use burn_wgpu::{Wgpu, WgpuDevice};
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
@@ -132,9 +132,11 @@ pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoRespons
         let rt = tokio::runtime::Handle::current();
 
         rt.block_on(async {
-            let metadata_indexer = MetadataIndexer::new(
+            let device = WgpuDevice::DefaultDevice;
+
+            let metadata_indexer: MetadataIndexer<_, Wgpu> = MetadataIndexer::new(
                 state.db.lock().await.clone(),
-                WgpuDevice::DefaultDevice,
+                device,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
                 state.arguments.clip_model_weights.clone(),

@@ -1,5 +1,4 @@
-use burn::prelude::Device;
-use burn_wgpu::Wgpu;
+use burn::prelude::{Backend, Device};
 use crate::metadata_provider::face_recognition_metadata_provider::FaceInPicture;
 use crate::metadata_provider::model::{Metadata, MetadataProvider};
 use ai_models::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
@@ -13,13 +12,13 @@ pub struct FaceAgeAndGender {
     pub age: f32,
 }
 
-pub struct AgeAndGenderMetadataProvider {
-    face_age_and_gender_estimator: FaceAgeAndGenderEstimator,
+pub struct AgeAndGenderMetadataProvider<B: Backend> {
+    face_age_and_gender_estimator: FaceAgeAndGenderEstimator<B>,
 }
 
-impl AgeAndGenderMetadataProvider {
+impl<B: Backend> AgeAndGenderMetadataProvider<B> {
     pub fn new(
-        device: Device<Wgpu>,
+        device: Device<B>,
         age_and_gender_model: &str,
     ) -> Self {
         Self {
@@ -31,7 +30,7 @@ impl AgeAndGenderMetadataProvider {
     }
 }
 
-impl MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for AgeAndGenderMetadataProvider {
+impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for AgeAndGenderMetadataProvider<B> {
     fn extract(
         &self,
         face_in_picture: &[Metadata<FaceInPicture>],
