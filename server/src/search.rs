@@ -19,10 +19,10 @@ pub struct ImageType {
     pub embedding: Vec<f32>,
 }
 
-pub async fn web_search_text<C>(
-    State(state): State<AppState<C>>,
+pub async fn web_search_text(
+    State(state): State<AppState>,
     Json(params): Json<SearchParams>,
-) -> Result<Json<SearchResponse>, StatusCode> where C: Connection{
+) -> Result<Json<SearchResponse>, StatusCode>{
     debug!("Handle Search with params: {:?}", params);
 
     let db = state.db.lock().await; // oder wie du deine DB-Instanz nutzt
@@ -124,7 +124,7 @@ pub async fn web_search_text<C>(
 }
 
 #[axum::debug_handler]
-pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoResponse{
+pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse{
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {
