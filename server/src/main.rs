@@ -11,7 +11,7 @@ use embed_anything::embeddings::embed::Embedder;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::{Connection, RecordId, Surreal};
+use surrealdb::{RecordId, Surreal};
 use surrealdb::engine::any::Any;
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};

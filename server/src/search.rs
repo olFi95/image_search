@@ -9,8 +9,7 @@ use burn_wgpu::{Wgpu, WgpuDevice};
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::{Connection, RecordId};
-use surrealdb::engine::remote::ws::Client;
+use surrealdb::RecordId;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {

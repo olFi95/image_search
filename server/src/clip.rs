@@ -2,7 +2,6 @@ use crate::AppState;
 use embed_anything::embeddings::embed::Embedder;
 use log::{error, info};
 use std::path::PathBuf;
-use surrealdb::Connection;
 use walkdir::WalkDir;
 
 pub async fn clip(state: &AppState, input: String) -> Vec<f32>{
