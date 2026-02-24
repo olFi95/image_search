@@ -9,7 +9,8 @@ pub async fn init_database(
     db.connect(cla.surrealdb_uri.clone()).await?;
 
 
-    if !cla.surrealdb_uri.starts_with("mem://") {
+    if !(cla.surrealdb_uri.starts_with("mem://")
+        || cla.surrealdb_uri.starts_with("rocksdb://")) {
         db.signin(Root {
                 username: &cla.surrealdb_username,
                 password: &cla.surrealdb_password,
