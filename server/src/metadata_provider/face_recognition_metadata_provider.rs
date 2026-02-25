@@ -23,7 +23,7 @@ impl <B>FaceRecognitionMetadataProvider<B> where B: Backend {
     }
 }
 
-#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceInPicture {
     pub top_left_x: f32,
     pub top_left_y: f32,
@@ -31,9 +31,69 @@ pub struct FaceInPicture {
     pub bottom_right_y: f32,
     pub confidence: f32,
     #[serde(skip)]
-    #[surreal(skip)]
     pub face: Option<DynamicImage>,
 }
+impl SurrealValue for FaceInPicture {
+    fn kind_of() -> ::surrealdb::types::Kind {
+        {
+            let mut map = std::collections::BTreeMap::new();
+            map.insert("top_left_x".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("top_left_y".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("bottom_right_x".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("bottom_right_y".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("confidence".to_string(), <f32 as SurrealValue>::kind_of());
+            ::surrealdb::types::Kind::Literal(::surrealdb::types::KindLiteral::Object(map))
+        }
+    }
+    fn is_value(value: &::surrealdb::types::Value) -> bool {
+        if let ::surrealdb::types::Value::Object(map) = value {
+            {
+                let mut valid = true;
+                if valid { if let Some(v) = map.get("top_left_x") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("top_left_y") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("bottom_right_x") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("bottom_right_y") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("confidence") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { return true; }
+            }
+        }
+        false;
+        false
+    }
+    fn into_value(self) -> ::surrealdb::types::Value {
+        let Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face } = self;
+        {
+            let mut map = ::surrealdb::types::Object::new();
+            map.insert("top_left_x".to_string(), top_left_x.into_value());
+            map.insert("top_left_y".to_string(), top_left_y.into_value());
+            map.insert("bottom_right_x".to_string(), bottom_right_x.into_value());
+            map.insert("bottom_right_y".to_string(), bottom_right_y.into_value());
+            map.insert("confidence".to_string(), confidence.into_value());
+            ::surrealdb::types::Value::Object(map)
+        }
+    }
+    fn from_value(value: ::surrealdb::types::Value) -> std::result::Result<Self, ::surrealdb::types::Error> {
+        if let ::surrealdb::types::Value::Object(mut map) = value {
+            {
+                let field_value = map.remove("top_left_x").unwrap_or_default();
+                let top_left_x = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "top_left_x", "FaceInPicture", e)))?;
+                let field_value = map.remove("top_left_y").unwrap_or_default();
+                let top_left_y = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "top_left_y", "FaceInPicture", e)))?;
+                let field_value = map.remove("bottom_right_x").unwrap_or_default();
+                let bottom_right_x = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "bottom_right_x", "FaceInPicture", e)))?;
+                let field_value = map.remove("bottom_right_y").unwrap_or_default();
+                let bottom_right_y = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "bottom_right_y", "FaceInPicture", e)))?;
+                let field_value = map.remove("confidence").unwrap_or_default();
+                let confidence = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "confidence", "FaceInPicture", e)))?;
+                Ok(Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face: None })
+            }
+        } else {
+            let err = ::surrealdb::types::ConversionError::from_value(::surrealdb::types::Kind::Object, &value);
+            Err(err.into())
+        }
+    }
+}
+
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPictureVector {
