@@ -5,8 +5,9 @@ use ai_models::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
 use log::error;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
+use surrealdb::types::SurrealValue;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceAgeAndGender {
     pub gender: f32,
     pub age: f32,

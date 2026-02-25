@@ -7,6 +7,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
+use surrealdb::types::SurrealValue;
 
 pub struct FaceRecognitionMetadataProvider<B: Backend> {
     face_detector: FaceDetector<B>,
@@ -22,7 +23,7 @@ impl <B>FaceRecognitionMetadataProvider<B> where B: Backend {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPicture {
     pub top_left_x: f32,
     pub top_left_y: f32,
@@ -30,10 +31,11 @@ pub struct FaceInPicture {
     pub bottom_right_y: f32,
     pub confidence: f32,
     #[serde(skip)]
+    #[surreal(skip)]
     pub face: Option<DynamicImage>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPictureVector {
     pub embedding: Vec<f32>,
 }
@@ -137,10 +139,7 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
             ON {FACE_IN_PICTURE_DATA_NAME}
             FIELDS base
             UNIQUE;
-            "#
-        ))
-        .query(format!(
-            r#"
+
             DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_base_unique
             ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
             FIELDS base
@@ -187,17 +186,12 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                         confidence = $confidence
                     WHERE base = $base
                 );
-                "#
-                ))
-                .query(format!(
-                    r#"
+
                 LET $id = $tmp[0].id;
                 RELATE $base -> {FACE_IN_PICTURE_RELATION_NAME} -> $id;
-                "#
-                ))
-                .query(r#"
+
                 $tmp[0];
-                "#.to_string())
+                "#))
                 .bind(("base", item.id.clone()))
                 .bind(("top_left_x", face_in_picture_metadata.top_left_x))
                 .bind(("top_left_y", face_in_picture_metadata.top_left_y))

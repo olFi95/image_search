@@ -9,9 +9,9 @@ use burn_wgpu::{Wgpu, WgpuDevice};
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::RecordId;
+use surrealdb::types::{RecordId, SurrealValue};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct ImageType {
     pub id: Option<RecordId>,
     pub image_path: String,

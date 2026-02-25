@@ -1,3 +1,4 @@
+use surrealdb_types::SurrealValue;
 use burn::tensor::backend::Backend;
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use ai_models::image_embedder::ImageEmbedder;
@@ -20,7 +21,7 @@ impl<B: Backend> ImageEmbeddingMetadataProvider<B> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct ImageEmbedding {
     pub embedding: Vec<f32>,
 }
@@ -62,10 +63,7 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
-            "#
-        ))
-        .query(format!(
-            r#"
+
             DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;

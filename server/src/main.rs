@@ -11,8 +11,9 @@ use embed_anything::embeddings::embed::Embedder;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb::types::{RecordId, SurrealValue};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
@@ -24,7 +25,7 @@ pub mod metadata_provider;
 mod search;
 mod server_arguments;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize)]
 struct DbImage {
     id: RecordId,
     image_path: String,

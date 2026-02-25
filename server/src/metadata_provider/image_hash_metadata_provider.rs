@@ -6,11 +6,12 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use surrealdb::{Connection, RecordId, Surreal};
+use surrealdb::{Connection, Surreal};
+use surrealdb::types::{RecordId, SurrealValue};
 
 pub struct ImageHashMetadataProvider;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct ImageHashMetadata {
     pub hash_type: String,
     pub hash: [u8; 32],

@@ -5,13 +5,14 @@ use crate::metadata_provider::image_embedding_metadata_provider::ImageEmbedding;
 use crate::metadata_provider::image_hash_metadata_provider::ImageHashMetadata;
 use crate::metadata_provider::model::BaseImage;
 use serde::{Deserialize, Serialize};
-use surrealdb::{Connection, RecordId, Surreal};
+use surrealdb::{Connection, Surreal};
+use surrealdb::types::{RecordId, SurrealValue};
 
 pub struct MetadataQueryEngine<C: Connection> {
     db: Surreal<C>
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPictureWithMetadata {
     pub top_left_x: f32,
     pub top_left_y: f32,
@@ -21,7 +22,7 @@ pub struct FaceInPictureWithMetadata {
     pub embedding: Vec<FaceInPictureVector>,
     pub age_and_gender: Vec<FaceAgeAndGender>,
 }
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct BaseImageWithMetadata {
     pub id: Option<RecordId>,
     pub path: String,
