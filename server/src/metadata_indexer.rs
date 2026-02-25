@@ -211,6 +211,10 @@ where
             .rebuild_index()
             .await
             .expect("cannot rebuild image embedding metadata index");
+        face_recognition_metadata_repository
+            .rebuild_index()
+            .await
+            .expect("cannot rebuild face embedding metadata index");
         info!(
             "Finished rebuilding indexes of metadata in {}.",
             path.to_str().unwrap_or("provided path")

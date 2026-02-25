@@ -216,6 +216,17 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
         .await?;
         Ok(())
     }
+    pub async fn rebuild_index(&self) -> anyhow::Result<()> {
+        self.db
+            .query(format!(
+                r#"
+            REBUILD INDEX IF EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_hnsw
+            ON {FACE_IN_PICTURE_VECTOR_DATA_NAME};
+            "#
+            ))
+            .await?;
+        Ok(())
+    }
 
     pub async fn insert_many_face_in_picture(
         &self,
