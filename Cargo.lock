@@ -10294,6 +10294,7 @@ dependencies = [
  "burn-ndarray",
  "burn-wgpu",
  "bytemuck",
+ "chrono",
  "clap",
  "data",
  "embed_anything",

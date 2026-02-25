@@ -1,3 +1,4 @@
+use chrono::Utc;
 use crate::metadata_provider::model::{
     BaseImageWithImage, Metadata, MetadataProvider,
 };
@@ -9,7 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{Datetime, SurrealValue};
-
+use chrono::DateTime;
 pub struct BasicMetadataProvider;
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
@@ -44,7 +45,13 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                                 height: base_image.image.height(),
                                 width: base_image.image.width(),
                                 size_in_bytes: metadata.len(),
-                                created: Some(metadata.into()),
+                                created: metadata
+                                    .created()
+                                    .ok()
+                                    .map(|t| {
+                                        let dt: chrono::DateTime<chrono::Utc> = t.into();
+                                        dt.into()
+                                    }),
                             }),
                             base: base_image.base_image.id.clone(),
                         })
@@ -63,6 +70,11 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
 
         Ok(results)
     }
+}
+fn metadata_to_datetime(metadata: &std::fs::Metadata) -> Option<Datetime> {
+    let system_time = metadata.created().ok()?;
+    let datetime: DateTime<Utc> = system_time.into();
+    Some(datetime.into())
 }
 
 static BASIC_METADATA_DATA_NAME: &str = "basic_metadata";

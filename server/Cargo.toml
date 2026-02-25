@@ -14,6 +14,7 @@ data = { path = "../data" }
 ai_models = { path = "../ai_models" , features = ["yolo","age_gender", "arcface", "clip"] }
 
 axum = { workspace = true }
+chrono = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }
 tokio = { workspace = true }
