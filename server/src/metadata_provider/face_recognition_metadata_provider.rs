@@ -204,6 +204,13 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
             ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
+
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_hnsw
+            ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
+            FIELDS embedding
+            HNSW
+            DIMENSION 512
+            DIST COSINE;
             "#
         ))
         .await?;

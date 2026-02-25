@@ -64,9 +64,12 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
             FIELDS base
             UNIQUE;
 
-            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_hnsw
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
-            FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;
+            FIELDS embedding
+            HNSW
+            DIMENSION 768
+            DIST COSINE;
             "#
         ))
         .await?;
@@ -76,7 +79,7 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
         self.db
             .query(format!(
                 r#"
-            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_hnsw
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME};
             "#
             ))
