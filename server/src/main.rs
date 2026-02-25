@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb::types::{RecordId, SurrealValue};
+use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
@@ -29,6 +29,20 @@ mod server_arguments;
 struct DbImage {
     id: RecordId,
     image_path: String,
+}
+impl DbImage {
+    pub fn id_string(&self) -> String {
+        let key_string = match &self.id.key {
+            RecordIdKey::String(s) => s.to_string(),
+            RecordIdKey::Number(n) => n.to_string(),
+            RecordIdKey::Uuid(u) => u.to_string(),
+            RecordIdKey::Array(a) => format!("{a:?}"),
+            RecordIdKey::Object(o) => format!("{o:?}"),
+            RecordIdKey::Range(r) => format!("{r:?}"),
+        };
+
+        format!("{}:{}", self.id.table, key_string)
+    }
 }
 
 #[derive(Clone)]

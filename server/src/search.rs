@@ -114,7 +114,7 @@ pub async fn web_search_text(
     let images: Vec<ImageReference> = db_images
         .into_iter()
         .map(|img| ImageReference {
-            id: img.id.to_string(),
+            id: img.id_string(),
             image_path: img.image_path.replace(&media_dir_str, "media/"),
         })
         .collect();
