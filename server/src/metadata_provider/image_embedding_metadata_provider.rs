@@ -69,7 +69,7 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
             FIELDS embedding
             HNSW
             DIMENSION 768
-            DIST COSINE;
+            DIST EUCLIDEAN;
             "#
         ))
         .await?;
