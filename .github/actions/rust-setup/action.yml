@@ -93,7 +93,7 @@ runs:
       run: |
         if ! command -v cargo-trunk &> /dev/null; then
           echo "Installing cargo-trunk..."
-          cargo install cargo-trunk --locked
+          cargo install trunk --locked
         else
           echo "cargo-trunk already installed"
         fi
