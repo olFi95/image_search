@@ -53,7 +53,7 @@ pub async fn web_search_text(
                     SELECT
                         id,
                         path AS image_path,
-                        ->has_image_embedding_vector->image_embedding_vector.embedding[0] AS embedding
+                        ->has_image_embedding_vector->image_embedding_vector[0].embedding AS embedding
                     FROM base_image
                     WHERE path IN $image_paths
                 "#,
@@ -86,14 +86,15 @@ pub async fn web_search_text(
                 id,
                 vector::distance::knn() AS similarity
             FROM image_embedding_vector
-            WHERE embedding <|500|> $reference
-            ORDER BY similarity
+            WHERE embedding <|500, 150|> $reference
+            ORDER BY similarity ASC
         );
+
 
         SELECT
             similarity,
-            <-has_image_embedding_vector<-base_image[0].id[0] AS id,
-            <-has_image_embedding_vector<-base_image[0].path[0] AS image_path
+            <-has_image_embedding_vector<-base_image[0].id AS id,
+            <-has_image_embedding_vector<-base_image[0].path AS image_path
         FROM $similar_vectors;
     "#;
 
