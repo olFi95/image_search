@@ -23,13 +23,14 @@ surrealdb = { version = "3.0.1", features = ["kv-mem", "kv-rocksdb"] }
 surrealdb-types = "3.0.1"
 which = "8.0.0"
 leptos = { version = "0.8.16", features = ["csr"] }
-leptos-use = { version = "0.18.2" }
-wasm-bindgen-futures = "0.4.63"
-web-sys = { version = "0.3.69", features = ["MouseEvent", "WheelEvent", "DomRect"] }
+leptos-use = { version = "0.18.0" }
+wasm-bindgen = "=0.2.112"
+wasm-bindgen-futures = "=0.4.62"
+web-sys = { version = "=0.3.89", features = ["MouseEvent", "WheelEvent", "DomRect"] }
 gloo-net = "0.6.0"
 serde_urlencoded = "0.7.1"
 urlencoding = "2.1.3"
-js-sys = "0.3.69"
+js-sys = "=0.3.89"
 serde-wasm-bindgen = "0.6.5"
 getrandom = { version = "0.4.1" }
 clap = { version = "4.5.60", features = ["derive"] }
@@ -42,6 +43,9 @@ expanduser = "1.2.2"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 tracing-web = "0.1.3"
+candle-core = "=0.9.1"
+candle-nn = "=0.9.1"
+candle-transformers = "=0.9.1"
 embed_anything = "0.6.7"
 walkdir = "2.5.0"
 rand = "0.10.0"

@@ -31,6 +31,9 @@ surrealdb-types = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "ansi", "tracing-log"] }
 embed_anything = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 walkdir = { workspace = true }
 urlencoding = { workspace = true }
 rand = { workspace = true }
