@@ -48,22 +48,19 @@ impl <C: Connection> MetadataQueryEngine<C> {
                     *,
                     ->has_face_in_picture_vector->face_in_picture_vector.* AS embedding,
                     ->has_face_age_and_gender_estimation->face_age_and_gender_estimation.* AS age_and_gender
-                FROM ->has_face_in_picture->face_in_picture
+                FROM $parent->has_face_in_picture->face_in_picture
                 ORDER BY top_left_x
             ) AS faces,
-            ->has_basic_metadata->basic_metadata.* AS basic_metadata,
-            ->has_image_embedding_vector->image_embedding_vector.* AS image_embedding,
-            ->has_image_hash_metadata->image_hash_metadata.* AS image_hash
-        FROM base_image
-        WHERE id = $id
-        LIMIT 1;
+            $id->has_basic_metadata->basic_metadata.* AS basic_metadata,
+            $id->has_image_embedding_vector->image_embedding_vector.* AS image_embedding,
+            $id->has_image_hash_metadata->image_hash_metadata.* AS image_hash
+        FROM ONLY $id;
         "#)
             .bind(("id", base_image_id)).await.expect("cannot query all metadata for base image");
-        let result = response.take::<Vec<BaseImageWithMetadata>>(0).expect("Error reading metadata for base_image");
-        if result.len()!=1 {
-            Err(anyhow::anyhow!("Expected exactly one BaseImageWithMetadata, got {}", result.len()))
-        } else {
-            Ok(result[0].clone())
+        let result = response.take::<Option<BaseImageWithMetadata>>(0).expect("Error reading metadata for base_image");
+        match result {
+            Some(metadata) => Ok(metadata),
+            None => Err(anyhow::anyhow!("No metadata found for base image")),
         }
     }
 

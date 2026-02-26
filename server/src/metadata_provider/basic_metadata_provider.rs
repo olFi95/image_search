@@ -131,7 +131,9 @@ impl <C: Connection>BasicMetadataRepository<C> {
                         height = $height,
                         width = $width,
                         size_in_bytes = $size_in_bytes,
-                        created = $created
+                        created = $created,
+                        base = $base
+                    WHERE base = $base
                 );
                 LET $id = $tmp[0].id;
                 RELATE $base -> {BASIC_METADATA_RELATION_NAME} -> $id;

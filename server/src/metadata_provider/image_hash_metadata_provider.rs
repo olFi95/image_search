@@ -107,7 +107,8 @@ impl <C: Connection>ImageHashMetadataRepository<C> {
                 LET $tmp = (
                     UPSERT {IMAGE_HASH_DATA_NAME}
                     SET hash = $hash,
-                        hash_type = $hash_type
+                        hash_type = $hash_type,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;

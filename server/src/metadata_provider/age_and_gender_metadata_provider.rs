@@ -131,7 +131,8 @@ impl<C: Connection> FaceAgeAndGenderMetadataRepository<C> {
                 LET $tmp = (
                     UPSERT {FACE_AGE_AND_GENDER_DATA_NAME}
                     SET age = $age,
-                        gender = $gender
+                        gender = $gender,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;

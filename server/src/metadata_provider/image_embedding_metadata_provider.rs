@@ -113,7 +113,8 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
                     r#"
                 LET $tmp = (
                     UPSERT {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
-                    SET embedding = $embedding
+                    SET embedding = $embedding,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;

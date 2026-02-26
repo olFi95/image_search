@@ -184,6 +184,128 @@ pub struct FaceRecognitionMetadataRepository<C: Connection> {
     db: Surreal<C>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metadata_provider::model::{BaseImage, BaseImageRepository, Metadata};
+    use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
+
+    #[tokio::test]
+    async fn test_insert_and_read_single_face() {
+        use surrealdb::engine::local::Mem;
+        use surrealdb::Surreal;
+
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+
+        // Setup repositories
+        let base_image_repo = BaseImageRepository::new(db.clone()).await;
+        let face_repo = FaceRecognitionMetadataRepository::new(db.clone()).await;
+        let query_engine = MetadataQueryEngine::new(db.clone());
+
+        // Insert a base image
+        let base_images = base_image_repo
+            .insert_many(vec![BaseImage { id: None, path: "/test/1_1.jpg".to_string() }])
+            .await
+            .expect("insert base image");
+        assert_eq!(base_images.len(), 1);
+        let base_image = &base_images[0];
+        assert!(base_image.id.is_some());
+
+        // Insert one face for this base image
+        let faces = vec![Metadata {
+            id: base_image.id.clone(),
+            metadata: Some(FaceInPicture {
+                top_left_x: 0.37,
+                top_left_y: 0.12,
+                bottom_right_x: 0.56,
+                bottom_right_y: 0.31,
+                confidence: 0.65,
+                face: None,
+            }),
+            base: base_image.id.clone(),
+        }];
+
+        let inserted = face_repo
+            .insert_many_face_in_picture(&faces)
+            .await
+            .expect("insert face");
+        assert_eq!(inserted.len(), 1, "Expected 1 inserted face, got {}", inserted.len());
+
+        // Read back via query engine
+        let metadata = query_engine
+            .get_all_metadata_attached_to_base_image(base_image)
+            .await
+            .expect("query metadata");
+        assert_eq!(metadata.faces.len(), 1, "Expected 1 face from query, got {}", metadata.faces.len());
+        assert!((metadata.faces[0].confidence - 0.65).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_read_multiple_faces() {
+        use surrealdb::engine::local::Mem;
+        use surrealdb::Surreal;
+
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+
+        let base_image_repo = BaseImageRepository::new(db.clone()).await;
+        let face_repo = FaceRecognitionMetadataRepository::new(db.clone()).await;
+        let query_engine = MetadataQueryEngine::new(db.clone());
+
+        // Insert a base image
+        let base_images = base_image_repo
+            .insert_many(vec![BaseImage { id: None, path: "/test/3_1.jpg".to_string() }])
+            .await
+            .expect("insert base image");
+        let base_image = &base_images[0];
+
+        // Insert 3 faces for this base image
+        let faces = vec![
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.1, top_left_y: 0.2,
+                    bottom_right_x: 0.3, bottom_right_y: 0.4,
+                    confidence: 0.9, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.4, top_left_y: 0.2,
+                    bottom_right_x: 0.6, bottom_right_y: 0.4,
+                    confidence: 0.85, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.7, top_left_y: 0.2,
+                    bottom_right_x: 0.9, bottom_right_y: 0.4,
+                    confidence: 0.8, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+        ];
+
+        let inserted = face_repo
+            .insert_many_face_in_picture(&faces)
+            .await
+            .expect("insert faces");
+        assert_eq!(inserted.len(), 3, "Expected 3 inserted faces, got {}", inserted.len());
+
+        // Read back via query engine
+        let metadata = query_engine
+            .get_all_metadata_attached_to_base_image(base_image)
+            .await
+            .expect("query metadata");
+        assert_eq!(metadata.faces.len(), 3, "Expected 3 faces from query, got {}", metadata.faces.len());
+    }
+}
+
 impl <C: Connection>FaceRecognitionMetadataRepository<C> {
     pub async fn new(db: Surreal<C>) -> Self {
         Self::prepare_repository(&db)
@@ -194,10 +316,9 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
     async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
-            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_unique
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_idx
             ON {FACE_IN_PICTURE_DATA_NAME}
-            FIELDS base
-            UNIQUE;
+            FIELDS base;
 
             DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_base_unique
             ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
@@ -255,13 +376,13 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                 .query(format!(
                     r#"
                 LET $tmp = (
-                    UPSERT {FACE_IN_PICTURE_DATA_NAME}
+                    CREATE {FACE_IN_PICTURE_DATA_NAME}
                     SET top_left_x = $top_left_x,
                         top_left_y = $top_left_y,
                         bottom_right_x = $bottom_right_x,
                         bottom_right_y = $bottom_right_y,
-                        confidence = $confidence
-                    WHERE base = $base
+                        confidence = $confidence,
+                        base = $base
                 );
 
                 LET $id = $tmp[0].id;
@@ -312,7 +433,8 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                     r#"
                 LET $tmp = (
                     UPSERT {FACE_IN_PICTURE_VECTOR_DATA_NAME}
-                    SET embedding = $embedding
+                    SET embedding = $embedding,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;
