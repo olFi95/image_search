@@ -57,11 +57,10 @@ impl SurrealValue for FaceInPicture {
                 if valid { return true; }
             }
         }
-        false;
         false
     }
     fn into_value(self) -> ::surrealdb::types::Value {
-        let Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face } = self;
+        let Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face: _ } = self;
         {
             let mut map = ::surrealdb::types::Object::new();
             map.insert("top_left_x".to_string(), top_left_x.into_value());
