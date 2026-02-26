@@ -2,7 +2,7 @@
 use anyhow::Context;
 use crate::clip::init_embedder;
 use crate::database::init_database;
-use crate::search::{indexing, web_search_text};
+use crate::search::{get_faces, indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
 use axum::{Router, routing::get};
@@ -93,6 +93,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
         .route("/search", post(web_search_text))
+        .route("/faces", post(get_faces))
         .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))
