@@ -146,6 +146,8 @@ pub async fn get_faces(
         params.image_path.clone()
     };
 
+    debug!("Resolved absolute_path for faces: {:?}", absolute_path);
+
     let db = state.db.lock().await;
 
     let mut response = db

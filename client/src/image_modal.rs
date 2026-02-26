@@ -2,11 +2,11 @@ use data::{FaceBoundingBox, FacesRequest, FacesResponse};
 use gloo_net::http::Request;
 use leptos::ev::keydown;
 use leptos::html::Div;
+use leptos::logging;
 use leptos::prelude::*;
 use leptos::*;
 use leptos_use::use_event_listener;
 use serde_json::from_str;
-use serde_wasm_bindgen::to_value;
 use tracing::trace;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
@@ -19,40 +19,51 @@ pub fn ImageModal(image_path: String, is_open: RwSignal<bool>) -> impl IntoView 
     let (last_mouse_pos, set_last_mouse_pos) = signal((0.0, 0.0));
     let (faces, set_faces) = signal(Vec::<FaceBoundingBox>::new());
     let (show_faces, set_show_faces) = signal(false);
-    let (img_natural_size, set_img_natural_size) = signal((1.0_f64, 1.0_f64));
 
-    // Load faces from API
-    {
-        let image_path = image_path.clone();
+    // Load faces from API when component mounts
+    let image_path_for_faces = image_path.clone();
+    Effect::new(move |_| {
+        let image_path = image_path_for_faces.clone();
+        logging::log!("ImageModal mounted, loading faces for: {}", image_path);
         spawn_local(async move {
             let request_body = FacesRequest {
                 image_path: image_path.clone(),
             };
-            match to_value(&request_body) {
-                Ok(js_value) => {
-                    let request = Request::post("/faces")
-                        .header("Content-Type", "application/json")
-                        .body(
-                            js_sys::JSON::stringify(&js_value)
-                                .unwrap()
-                                .as_string()
-                                .unwrap(),
-                        )
-                        .unwrap();
-                    if let Ok(response) = request.send().await {
-                        if let Ok(text) = response.text().await {
-                            if let Ok(parsed) = from_str::<FacesResponse>(&text) {
-                                set_faces.set(parsed.faces);
+            let body_json = serde_json::to_string(&request_body).unwrap();
+            logging::log!("Sending faces request: {}", body_json);
+            let result = Request::post("/faces")
+                .header("Content-Type", "application/json")
+                .body(&body_json)
+                .unwrap()
+                .send()
+                .await;
+            match result {
+                Ok(response) => {
+                    logging::log!("Faces response status: {}", response.status());
+                    match response.text().await {
+                        Ok(text) => {
+                            logging::log!("Faces response body: {}", text);
+                            match from_str::<FacesResponse>(&text) {
+                                Ok(parsed) => {
+                                    logging::log!("Parsed {} faces", parsed.faces.len());
+                                    set_faces.set(parsed.faces);
+                                }
+                                Err(e) => {
+                                    logging::error!("Failed to parse FacesResponse: {:?}", e);
+                                }
                             }
+                        }
+                        Err(e) => {
+                            logging::error!("Failed to read response text: {:?}", e);
                         }
                     }
                 }
                 Err(e) => {
-                    leptos::logging::error!("Failed to serialize FacesRequest: {:?}", e);
+                    logging::error!("Faces request failed: {:?}", e);
                 }
             }
         });
-    }
+    });
 
     let on_wheel = move |ev: WheelEvent| {
         ev.prevent_default();
@@ -167,19 +178,14 @@ pub fn ImageModal(image_path: String, is_open: RwSignal<bool>) -> impl IntoView 
                         src=image_path
                         draggable="false"
                         style="user-select: none; pointer-events: none; display: block; max-width: none;"
-                        on:load=move |ev| {
-                            let img: web_sys::HtmlImageElement = event_target(&ev);
-                            set_img_natural_size.set((img.natural_width() as f64, img.natural_height() as f64));
-                        }
                     />
                     <Show when=move || show_faces.get() && !faces.get().is_empty() fallback=|| ()>
                         {move || {
-                            let (nat_w, nat_h) = img_natural_size.get();
                             faces.get().into_iter().map(|face| {
-                                let left = (face.top_left_x as f64 / nat_w) * 100.0;
-                                let top = (face.top_left_y as f64 / nat_h) * 100.0;
-                                let width = ((face.bottom_right_x - face.top_left_x) as f64 / nat_w) * 100.0;
-                                let height = ((face.bottom_right_y - face.top_left_y) as f64 / nat_h) * 100.0;
+                                let left = face.top_left_x as f64 * 100.0;
+                                let top = face.top_left_y as f64 * 100.0;
+                                let width = (face.bottom_right_x - face.top_left_x) as f64 * 100.0;
+                                let height = (face.bottom_right_y - face.top_left_y) as f64 * 100.0;
                                 let label = match (face.age, face.gender) {
                                     (Some(age), Some(gender)) => {
                                         let gender_str = if gender > 0.5 { "♂" } else { "♀" };
