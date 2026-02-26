@@ -118,10 +118,10 @@ fn copy_if_changed(src: &PathBuf, dst: &PathBuf) -> anyhow::Result<()> {
             return Ok(());
         }
     }
-    if let Some(parent) = dst.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)?;
     }
     fs::write(dst, src_content)?;
     Ok(())
