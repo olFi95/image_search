@@ -199,6 +199,34 @@ mod tests {
     }
 
     #[test]
+    pub fn test_find_faces_single_person() {
+        let device = NdArrayDevice::default();
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
+
+        let image = open("../test_pictures/1_1.jpg").expect("Failed to open image");
+        let faces = face_detector.detect(&image);
+        assert_eq!(faces.len(), 1);
+        assert!(faces[0].bbox.score > 0.5);
+        assert!((faces[0].bbox.xmin - 318.8).abs() < 5.0);
+        assert!((faces[0].bbox.ymin - 158.8).abs() < 5.0);
+        assert!((faces[0].bbox.xmax - 479.0).abs() < 5.0);
+        assert!((faces[0].bbox.ymax - 398.3).abs() < 5.0);
+    }
+
+    #[test]
+    pub fn test_find_faces_three_persons() {
+        let device = NdArrayDevice::default();
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
+
+        let image = open("../test_pictures/3_1.jpg").expect("Failed to open image");
+        let faces = face_detector.detect(&image);
+        assert_eq!(faces.len(), 3);
+        for face in &faces {
+            assert!(face.bbox.score > 0.5);
+        }
+    }
+
+    #[test]
     pub fn test_find_faces_statue() {
         let device = NdArrayDevice::default();
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
