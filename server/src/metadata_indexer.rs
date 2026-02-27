@@ -100,7 +100,7 @@ where
         info!("Starting indexing of {} images in {}", total_images, path.to_str().unwrap_or("provided path"));
 
         let chunk_size = 25;
-        let total_chunks = (total_images + chunk_size - 1) / chunk_size;
+        let total_chunks = (total_images.div_ceil(chunk_size)) / chunk_size;
         for (chunk_idx, image_paths) in all_image_paths.chunks(chunk_size).enumerate() {
             let chunk_start = Instant::now();
             info!("Processing chunk {}/{} ({} images)", chunk_idx + 1, total_chunks, image_paths.len());

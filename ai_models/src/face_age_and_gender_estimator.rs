@@ -38,7 +38,7 @@ impl<B: Backend> FaceAgeAndGenderEstimator<B> {
         // Preprocess all faces on CPU first
         let preprocessed: Vec<_> = face_images
             .iter()
-            .map(|img| preprocess_clip(*img))
+            .map(|img| preprocess_clip(img))
             .collect();
 
         // Forward each through GPU individually

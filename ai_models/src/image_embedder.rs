@@ -38,7 +38,7 @@ impl<B: Backend> ImageEmbedder<B> {
         // Preprocess all images on CPU first
         let preprocessed: Vec<_> = images
             .iter()
-            .map(|img| preprocess_clip(*img))
+            .map(|img| preprocess_clip(img))
             .collect();
 
         // Forward each through GPU individually and normalize

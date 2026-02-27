@@ -80,7 +80,7 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for
 
         let results: Vec<Metadata<FaceAgeAndGender>> = valid_ids
             .into_iter()
-            .zip(batch_results.into_iter())
+            .zip(batch_results)
             .map(|(id, embedding)| Metadata {
                 id: None,
                 metadata: Some(FaceAgeAndGender {

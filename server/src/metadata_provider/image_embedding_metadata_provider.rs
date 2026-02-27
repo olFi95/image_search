@@ -40,7 +40,7 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageE
 
         let results: Vec<Metadata<ImageEmbedding>> = images
             .iter()
-            .zip(embeddings.into_iter())
+            .zip(embeddings)
             .map(|(image, embedding)| Metadata {
                 id: None,
                 metadata: Some(ImageEmbedding { embedding }),
