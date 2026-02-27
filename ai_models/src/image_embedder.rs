@@ -26,4 +26,31 @@ impl<B: Backend> ImageEmbedder<B> {
         let embedding = embedding / norm;
         embedding.to_data().as_slice::<f32>().unwrap().to_vec()
     }
+
+    /// Embed a batch of images. Each image is forwarded individually through the GPU
+    /// (ONNX models have fixed batch=1 reshapes), but CPU preprocessing is collected upfront.
+    /// Returns one Vec<f32> (length 768) per image, in the same order as the input.
+    pub fn embed_batch(&self, images: &[&DynamicImage]) -> Vec<Vec<f32>> {
+        if images.is_empty() {
+            return Vec::new();
+        }
+
+        // Preprocess all images on CPU first
+        let preprocessed: Vec<_> = images
+            .iter()
+            .map(|img| preprocess_clip(*img))
+            .collect();
+
+        // Forward each through GPU individually and normalize
+        preprocessed
+            .into_iter()
+            .map(|tensor| {
+                let embedding = self.model.forward(tensor);
+                let embedding = embedding.reshape([768]);
+                let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
+                let embedding = embedding / norm;
+                embedding.to_data().as_slice::<f32>().unwrap().to_vec()
+            })
+            .collect()
+    }
 }

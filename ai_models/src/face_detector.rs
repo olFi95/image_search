@@ -81,6 +81,82 @@ impl<B> FaceDetector<B> where B: Backend {
 
         faces
     }
+
+    /// Detect faces in a batch of images. CPU preprocessing is parallelized,
+    /// then each image is forwarded through the GPU model individually (the ONNX model
+    /// has fixed batch=1 in internal reshapes).
+    /// Returns a Vec of Vec<DetectedFace>, one inner Vec per input image, in the same order.
+    pub fn detect_batch(&self, images: &[&DynamicImage]) -> Vec<Vec<DetectedFace>> {
+        if images.is_empty() {
+            return Vec::new();
+        }
+        if images.len() == 1 {
+            return vec![self.detect(images[0])];
+        }
+
+        // Preprocess all images on CPU (scaling + tensor creation)
+        let preprocessed: Vec<(Tensor<B, 4>, ResizedImage, &DynamicImage)> = images
+            .iter()
+            .map(|img| {
+                let scaled = scale_image::<640, 640>((*img).clone());
+                let tensor = image_to_tensor::<B>(&scaled.scaled_image, &self.device);
+                (tensor, scaled, *img)
+            })
+            .collect();
+
+        let num_anchors = 8400;
+        let stride_attr = num_anchors;
+        let conf_threshold = 0.5;
+
+        let mut all_results = Vec::with_capacity(images.len());
+
+        // Forward pass each image individually through GPU
+        for (input, scaled_image, original_img) in preprocessed {
+            let output = self.model.forward(input);
+            let data = output.to_data();
+            let data_slice = data.as_slice::<f32>().expect("Tensor is not f32");
+
+            let mut boxes = Vec::new();
+            for anchor in 0..num_anchors {
+                let offset = anchor;
+                let x = data_slice[offset];
+                let y = data_slice[offset + stride_attr];
+                let w = data_slice[offset + 2 * stride_attr];
+                let h = data_slice[offset + 3 * stride_attr];
+                let conf = data_slice[offset + 4 * stride_attr];
+
+                if conf < conf_threshold {
+                    continue;
+                }
+
+                let (sx, sy) = scaled_image.get_scale_factors();
+                let xmin = (x - w / 2.0) * sx;
+                let ymin = (y - h / 2.0) * sy;
+                let xmax = (x + w / 2.0) * sx;
+                let ymax = (y + h / 2.0) * sy;
+
+                boxes.push(BBox { xmin, ymin, xmax, ymax, score: conf });
+            }
+
+            let final_boxes = nms(boxes, 0.45);
+            let mut faces = Vec::new();
+            for b in &final_boxes {
+                let face = original_img.clone().crop(
+                    b.xmin as u32,
+                    b.ymin as u32,
+                    (b.xmax - b.xmin) as u32,
+                    (b.ymax - b.ymin) as u32,
+                );
+                faces.push(DetectedFace {
+                    face_image: face,
+                    bbox: b.clone(),
+                });
+            }
+            all_results.push(faces);
+        }
+
+        all_results
+    }
 }
 
 pub struct DetectedFace {

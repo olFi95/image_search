@@ -22,6 +22,7 @@ use log::{info, trace};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
+use std::time::Instant;
 use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
 
@@ -62,6 +63,8 @@ where
     }
 
     pub async fn index_metadata(&self, path: PathBuf) -> anyhow::Result<()> {
+        let total_start = Instant::now();
+
         // Metadata Provider
         let image_hash_metadata_provider = ImageHashMetadataProvider;
         let basic_metadata_provider = BasicMetadataProvider;
@@ -92,15 +95,21 @@ where
             .par_iter()
             .map(PathBuf::from)
             .collect();
+
+        let total_images = all_image_paths.len();
+        info!("Starting indexing of {} images in {}", total_images, path.to_str().unwrap_or("provided path"));
+
         let chunk_size = 25;
-        for image_paths in all_image_paths.chunks(chunk_size) {
+        let total_chunks = (total_images + chunk_size - 1) / chunk_size;
+        for (chunk_idx, image_paths) in all_image_paths.chunks(chunk_size).enumerate() {
+            let chunk_start = Instant::now();
+            info!("Processing chunk {}/{} ({} images)", chunk_idx + 1, total_chunks, image_paths.len());
+
             // Convert Path Strings into PathBufs and then into BaseImages
-            trace!("converting {chunk_size} paths to base_images");
             let mut base_images: Vec<BaseImage> = image_paths
                 .par_iter()
                 .map(|path| BaseImage::new(PathBuf::from(path)))
                 .collect();
-            trace!("Loading inserting {} base_images", &base_images.len());
 
             // Save BaseImages to the repository
             base_images = base_image_repository
@@ -108,104 +117,94 @@ where
                 .await
                 .expect("Inserting base image failed");
 
-            // Now actually load the images. Drop the Images that were not able to load properly.
-            trace!("loading images into {} base_images", &base_images.len());
+            // Now actually load the images in parallel on CPU. Drop the Images that were not able to load properly.
+            let t = Instant::now();
             let base_images_with_image: Vec<_> = base_images
                 .par_iter()
                 .cloned()
                 .map(|bi| bi.try_into())
                 .filter_map(Result::ok)
                 .collect();
+            trace!("Image loading: {:?} ({} images)", t.elapsed(), base_images_with_image.len());
 
-            // Calculate hashes of the image data.
-            trace!(
-                "calculating hashes for {} base_images",
-                &base_images_with_image.len()
-            );
+            // --- CPU-only work: hashes + basic metadata (uses rayon, no GPU) ---
+            let t = Instant::now();
             let hashes = image_hash_metadata_provider
                 .extract(&base_images_with_image)
                 .expect("cannot extract hashes");
+            let basic_metadata = basic_metadata_provider
+                .extract(&base_images_with_image)
+                .expect("cannot extract basic metadata");
+            trace!("CPU metadata (hashes + basic): {:?}", t.elapsed());
 
-            // Save hashes to the repository
-            trace!("saving {} hashes", &hashes.len());
+            // --- GPU work: face detection (batched) ---
+            let t = Instant::now();
+            let faces = face_recognition_metadata_provider
+                .extract(&base_images_with_image)
+                .expect("cannot extract face recognition metadata");
+            trace!("Face detection (GPU, batched): {:?} ({} faces found)", t.elapsed(), faces.len());
+
+            // --- GPU work: image embedding (batched) ---
+            let t = Instant::now();
+            let image_embeddings = image_embedding_metadata_provider
+                .extract(&base_images_with_image)
+                .expect("cannot embed images");
+            trace!("Image embedding (GPU, batched): {:?}", t.elapsed());
+
+            // Save CPU-only metadata to DB
+            let t = Instant::now();
             let _ = image_hash_metadata_repository
                 .insert_many(&hashes)
                 .await
                 .expect("could not save hashes");
-
-            // Read basic metadata of the image data.
-            trace!(
-                "read basic metadata for {} base_images",
-                &base_images_with_image.len()
-            );
-            let basic_metadata = basic_metadata_provider
-                .extract(&base_images_with_image)
-                .expect("cannot extract basic metadata");
-
-            // Save basic metadata to the repository
-            trace!("saving {} hashes", &basic_metadata.len());
             basic_metadata_repository
                 .insert_many(&basic_metadata)
                 .await
-                .expect("could not save hashes");
+                .expect("could not save basic metadata");
+            trace!("DB insert (hashes + basic metadata): {:?}", t.elapsed());
 
-            // Run face recognition on images.
-            trace!(
-                "run face recognition on {} images",
-                &base_images_with_image.len()
-            );
-            let faces = face_recognition_metadata_provider
-                .extract(&base_images_with_image)
-                .expect("cannot extract face recognition metadata");
             // Save face recognition metadata to the repository.
-            trace!("saving {} face recognition metadata entries", &faces.len());
+            let t = Instant::now();
             let faces = face_recognition_metadata_repository
                 .insert_many_face_in_picture(&faces)
                 .await
                 .expect("cannot save discovered faces to database.");
+            trace!("DB insert (face positions): {:?}", t.elapsed());
 
-            // Run Age and Gender estimation on discovered faces.
-            trace!(
-                "running age and gender estimation on {} faces",
-                &faces.len()
-            );
-            let res = face_age_and_gender_metadata_provider
+            // --- GPU work: age/gender estimation + face embedding (batched) ---
+            let t = Instant::now();
+            let age_gender_results = face_age_and_gender_metadata_provider
                 .extract(&faces)
                 .expect("cannot extract age and gender");
-            trace!("saving age and gender of {} faces.", &res.len());
-            face_age_and_gender_metadata_repository
-                .insert_many_age_and_gender(&res)
-                .await
-                .expect("could not save age and gender metadata");
+            trace!("Age/gender estimation (GPU, batched): {:?} ({} faces)", t.elapsed(), age_gender_results.len());
 
-            // Embed discovered faces.
-            trace!(
-                "embedding {} faces that were found in the images.",
-                &faces.len()
-            );
+            let t = Instant::now();
             let face_embeddings = face_recognition_metadata_provider
                 .extract(&faces)
                 .expect("cannot embed faces");
-            trace!("saving {} face embeddings", &face_embeddings.len());
+            trace!("Face embedding (GPU, batched): {:?} ({} faces)", t.elapsed(), face_embeddings.len());
+
+            // Save remaining metadata to DB
+            let t = Instant::now();
+            face_age_and_gender_metadata_repository
+                .insert_many_age_and_gender(&age_gender_results)
+                .await
+                .expect("could not save age and gender metadata");
             face_recognition_metadata_repository
                 .insert_many_face_embeddings(&face_embeddings)
                 .await
                 .expect("cannot save face embeddings");
-
-            // Embed full images.
-            trace!("embedding {} images", &base_images_with_image.len());
-            let image_embeddings = image_embedding_metadata_provider
-                .extract(&base_images_with_image)
-                .expect("cannot embed images");
-            trace!("saving {} image embeddings", &image_embeddings.len());
             image_embedding_metadata_repository
                 .insert_many_image_embeddings(&image_embeddings)
                 .await
                 .expect("cannot save image embeddings");
+            trace!("DB insert (age/gender + face embeddings + image embeddings): {:?}", t.elapsed());
+
+            info!("Chunk {}/{} done in {:?}", chunk_idx + 1, total_chunks, chunk_start.elapsed());
         }
         info!(
-            "Finished indexing metadata for images in {}. Rebuilding indexes now.",
-            path.to_str().unwrap_or("provided path")
+            "Finished indexing metadata for {} images in {:?}. Rebuilding indexes now.",
+            total_images, total_start.elapsed()
         );
         image_embedding_metadata_repository
             .rebuild_index()
@@ -216,8 +215,8 @@ where
             .await
             .expect("cannot rebuild face embedding metadata index");
         info!(
-            "Finished rebuilding indexes of metadata in {}.",
-            path.to_str().unwrap_or("provided path")
+            "Finished rebuilding indexes. Total time: {:?}",
+            total_start.elapsed()
         );
         Ok(())
     }

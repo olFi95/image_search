@@ -31,15 +31,23 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageE
         &self,
         images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
-        let mut results: Vec<Metadata<ImageEmbedding>> = vec![];
-        for image in images {
-            let embedding = self.image_embedder.embed(&image.image);
-            results.push(Metadata {
+        if images.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let image_refs: Vec<&image::DynamicImage> = images.iter().map(|img| &img.image).collect();
+        let embeddings = self.image_embedder.embed_batch(&image_refs);
+
+        let results: Vec<Metadata<ImageEmbedding>> = images
+            .iter()
+            .zip(embeddings.into_iter())
+            .map(|(image, embedding)| Metadata {
                 id: None,
                 metadata: Some(ImageEmbedding { embedding }),
                 base: Some(image.base_image.id.clone().unwrap()),
-            });
-        }
+            })
+            .collect();
+
         Ok(results)
     }
 }

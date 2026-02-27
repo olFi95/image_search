@@ -30,6 +30,34 @@ impl <B: Backend>FaceEmbedder<B> {
         embedding.to_data().as_slice::<f32>().unwrap().to_vec()
     }
 
+    /// Generate face embeddings for a batch of cropped face images.
+    /// Each image is forwarded individually (ONNX models have fixed batch=1 reshapes),
+    /// but preprocessing is collected upfront for better cache locality.
+    /// Returns one Vec<f32> (length 512) per face, in the same order as the input.
+    pub fn embed_batch(&self, face_images: &[DynamicImage]) -> Vec<Vec<f32>> {
+        if face_images.is_empty() {
+            return Vec::new();
+        }
+
+        // Preprocess all faces on CPU first
+        let preprocessed: Vec<Tensor<B, 4>> = face_images
+            .iter()
+            .map(|img| Self::preprocess_arcface(img))
+            .collect();
+
+        // Forward each through GPU individually and normalize
+        preprocessed
+            .into_iter()
+            .map(|tensor| {
+                let embedding = self.model.forward(tensor);
+                let embedding = embedding.reshape([512]);
+                let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
+                let embedding = embedding / norm;
+                embedding.to_data().as_slice::<f32>().unwrap().to_vec()
+            })
+            .collect()
+    }
+
     pub fn preprocess_arcface(img: &DynamicImage) -> Tensor<B, 4> {
         let img = img.resize_exact(112, 112, image::imageops::FilterType::Triangle);
         let rgb = img.to_rgb8();
@@ -51,6 +79,7 @@ impl <B: Backend>FaceEmbedder<B> {
             &B::Device::default(),
         )
     }
+
 }
 
 #[cfg(test)]

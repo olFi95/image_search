@@ -7,7 +7,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
-use surrealdb::types::SurrealValue;
+use surrealdb::types::{RecordId, SurrealValue};
 
 pub struct FaceRecognitionMetadataProvider<B: Backend> {
     face_detector: FaceDetector<B>,
@@ -109,11 +109,17 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRec
         &self,
         base_images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
+        if base_images.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let image_refs: Vec<&image::DynamicImage> = base_images.iter().map(|bi| &bi.image).collect();
+        let batch_results = self.face_detector.detect_batch(&image_refs);
+
         let mut results: Vec<Metadata<FaceInPicture>> = vec![];
-        for base_image in base_images {
+        for (base_image, detected_faces) in base_images.iter().zip(batch_results.into_iter()) {
             let image_height = base_image.image.height() as f32;
             let image_width = base_image.image.width() as f32;
-            let detected_faces = self.face_detector.detect(&base_image.image);
             for face in detected_faces {
                 results.push(Metadata {
                     id: base_image.base_image.id.clone(),
@@ -139,43 +145,57 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
         &self,
         face_in_picture: &[Metadata<FaceInPicture>],
     ) -> anyhow::Result<Vec<Metadata<FaceInPictureVector>>> {
-        let mut results: Vec<Metadata<FaceInPictureVector>> = vec![];
-        for face_in_picture_metadata in face_in_picture {
-            let face_in_picture = face_in_picture_metadata.clone();
-            let face_in_picture_metadata = match face_in_picture.metadata {
-                Some(metadata) => metadata,
+        if face_in_picture.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Collect valid faces and their indices
+        let mut valid_faces: Vec<DynamicImage> = Vec::new();
+        let mut valid_ids: Vec<RecordId> = Vec::new();
+
+        for fip_metadata in face_in_picture {
+            let fip = fip_metadata.clone();
+            let metadata = match fip.metadata {
+                Some(m) => m,
                 None => {
-                    error!(
-                        "FaceInPicture metadata is missing for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("FaceInPicture metadata is missing for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face = match face_in_picture_metadata.face {
-                Some(face) => face,
+            let face = match metadata.face {
+                Some(f) => f,
                 None => {
-                    error!(
-                        "Face image is missing in FaceInPicture metadata for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("Face image is missing in FaceInPicture metadata for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face_in_picture_id = match face_in_picture.id {
+            let id = match fip.id {
+                Some(id) => id,
                 None => {
                     error!("FaceInPicture ID is missing");
                     continue;
                 }
-                Some(id) => id,
             };
-            let embedding = self.face_embedder.embed(face);
-            results.push(Metadata {
+            valid_faces.push(face);
+            valid_ids.push(id);
+        }
+
+        if valid_faces.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let embeddings = self.face_embedder.embed_batch(&valid_faces);
+
+        let results: Vec<Metadata<FaceInPictureVector>> = valid_ids
+            .into_iter()
+            .zip(embeddings.into_iter())
+            .map(|(id, embedding)| Metadata {
                 id: None,
                 metadata: Some(FaceInPictureVector { embedding }),
-                base: Some(face_in_picture_id),
-            });
-        }
+                base: Some(id),
+            })
+            .collect();
+
         Ok(results)
     }
 }
