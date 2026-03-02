@@ -67,6 +67,6 @@ jobs:
             --release \
             --workspace \
             --ignore-panics \
-            --out Xml \
+            --out xml html lcov\
             --output-dir coverage/
 
