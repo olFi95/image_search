@@ -1,21 +1,19 @@
 use crate::arcface;
 use burn::Tensor;
-use burn::backend::Wgpu;
-use burn::backend::wgpu::WgpuDevice;
-use burn::prelude::Device;
+use burn::prelude::{Backend, Device};
 use image::DynamicImage;
 
-pub struct FaceEmbedder {
-    pub model: Box<arcface::Model<Wgpu>>,
-    pub device: Device<Wgpu>,
+pub struct FaceEmbedder<B: Backend> {
+    pub model: arcface::Model<B>,
+    pub device: Device<B>,
 }
 
-impl FaceEmbedder {
-    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
-        let model = Box::new(arcface::Model::from_file(
+impl <B: Backend>FaceEmbedder<B> {
+    pub fn new(model_path: &str, device: Device<B>) -> Self {
+        let model = arcface::Model::from_file(
             model_path,
             &device,
-        ));
+        );
         FaceEmbedder {
             model,
             device,
@@ -32,7 +30,7 @@ impl FaceEmbedder {
         embedding.to_data().as_slice::<f32>().unwrap().to_vec()
     }
 
-    pub fn preprocess_arcface(img: &DynamicImage) -> Tensor<Wgpu, 4> {
+    pub fn preprocess_arcface(img: &DynamicImage) -> Tensor<B, 4> {
         let img = img.resize_exact(112, 112, image::imageops::FilterType::Triangle);
         let rgb = img.to_rgb8();
         let mut data = Vec::with_capacity(112 * 112 * 3);
@@ -48,9 +46,9 @@ impl FaceEmbedder {
             }
         }
 
-        Tensor::<Wgpu, 4>::from_data(
+        Tensor::<B, 4>::from_data(
             burn::tensor::TensorData::new(data, [1, 112, 112, 3]),
-            &WgpuDevice::DefaultDevice,
+            &B::Device::default(),
         )
     }
 }
@@ -59,34 +57,17 @@ impl FaceEmbedder {
 mod tests {
     use crate::face_detector::FaceDetector;
     use crate::face_embedder::FaceEmbedder;
-    use crate::{arcface, yolo};
-    use burn::backend::Wgpu;
-    use burn::backend::wgpu::WgpuDevice;
+    use burn_ndarray::{NdArray, NdArrayDevice};
     use image::open;
-    use std::sync::Arc;
 
     #[test]
     fn embed_all_faces_of_group_photo() {
-        let device = WgpuDevice::DefaultDevice;
+        let device = NdArrayDevice::default();
 
-        let face_detector = {
-            let model: yolo::Model<Wgpu> =
-                yolo::Model::from_file("../models/yolo.bpk", &device);
-            FaceDetector {
-                model: Box::new(model),
-                device: device.clone(),
-            }
-        };
-        let face_embedder = {
-            let model: arcface::Model<Wgpu> =
-                arcface::Model::from_file("../models/arcface_model.bpk", &device);
-            FaceEmbedder {
-                model: Box::new(model),
-                device,
-            }
-        };
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
+        let face_embedder = FaceEmbedder::<NdArray>::new("../models/arcface_model.bpk", device);
 
-        let image = open("../../test_pictures/pexels-fauxels-3184398.jpg").expect("Failed to open image");
+        let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
         let faces = face_detector.detect(&image);
         let mut embeddings = Vec::new();
         for face in faces {

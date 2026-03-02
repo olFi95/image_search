@@ -5,12 +5,11 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
-use burn_wgpu::WgpuDevice;
+use burn_wgpu::{Wgpu, WgpuDevice};
 use data::{ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::{Connection, RecordId};
-use surrealdb::engine::remote::ws::Client;
+use surrealdb::RecordId;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageType {
@@ -19,10 +18,10 @@ pub struct ImageType {
     pub embedding: Vec<f32>,
 }
 
-pub async fn web_search_text<C>(
-    State(state): State<AppState<C>>,
+pub async fn web_search_text(
+    State(state): State<AppState>,
     Json(params): Json<SearchParams>,
-) -> Result<Json<SearchResponse>, StatusCode> where C: Connection{
+) -> Result<Json<SearchResponse>, StatusCode>{
     debug!("Handle Search with params: {:?}", params);
 
     let db = state.db.lock().await; // oder wie du deine DB-Instanz nutzt
@@ -124,7 +123,7 @@ pub async fn web_search_text<C>(
 }
 
 #[axum::debug_handler]
-pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoResponse{
+pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse{
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -132,9 +131,11 @@ pub async fn indexing(State(state): State<AppState<Client>>) -> impl IntoRespons
         let rt = tokio::runtime::Handle::current();
 
         rt.block_on(async {
-            let metadata_indexer = MetadataIndexer::new(
+            let device = WgpuDevice::DefaultDevice;
+
+            let metadata_indexer: MetadataIndexer<_, Wgpu> = MetadataIndexer::new(
                 state.db.lock().await.clone(),
-                WgpuDevice::DefaultDevice,
+                device,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
                 state.arguments.clip_model_weights.clone(),

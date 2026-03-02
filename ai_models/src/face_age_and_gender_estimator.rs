@@ -1,19 +1,18 @@
 use crate::age_gender;
-use burn::backend::Wgpu;
-use burn::prelude::Device;
+use burn::prelude::{Backend, Device};
 use image::DynamicImage;
 use crate::utils::preprocess_clip;
 
-pub struct FaceAgeAndGenderEstimator {
-    pub model: Box<age_gender::Model<Wgpu>>,
-    pub device: Device<Wgpu>,
+pub struct FaceAgeAndGenderEstimator<B: Backend> {
+    pub model: age_gender::Model<B>,
+    pub device: Device<B>,
 }
-impl FaceAgeAndGenderEstimator {
-    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
-        let model = Box::new(age_gender::Model::from_file(
+impl<B: Backend> FaceAgeAndGenderEstimator<B> {
+    pub fn new(model_path: &str, device: Device<B>) -> Self {
+        let model = age_gender::Model::from_file(
             model_path,
             &device,
-        ));
+        );
         Self {
             model,
             device,

@@ -16,8 +16,11 @@ anyhow = { workspace = true }
 burn-import = { workspace = true }
 hf-hub = { workspace = true }
 
+[dev-dependencies]
+burn-ndarray = { workspace = true }
+
 [features]
-default = []
+default = ["arcface", "yolo", "age_gender", "clip"]
 arcface = []
 yolo = []
 age_gender = []

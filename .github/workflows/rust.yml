@@ -1,0 +1,72 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TOOL_CACHE: /toolcache
+      CARGO_HOME: /toolcache/.cargo
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+
+      - name: Cargo Clippy
+        run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TOOL_CACHE: /toolcache
+      CARGO_HOME: /toolcache/.cargo
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+
+      - name: Build
+        run: cargo build
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TOOL_CACHE: /toolcache
+      CARGO_HOME: /toolcache/.cargo
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          cargo-tarpaulin: "true"
+
+      - name: Run Tests
+        run: cargo test --release --workspace
+
+      - name: Run Tests with Coverage
+        run: |
+          cargo tarpaulin \
+            --engine llvm \
+            --release \
+            --workspace \
+            --ignore-panics \
+            --out xml html lcov\
+            --output-dir coverage/
+

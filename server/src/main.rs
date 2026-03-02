@@ -11,7 +11,8 @@ use embed_anything::embeddings::embed::Embedder;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::{Connection, RecordId, Surreal};
+use surrealdb::{RecordId, Surreal};
+use surrealdb::engine::any::Any;
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
@@ -30,10 +31,9 @@ struct DbImage {
 }
 
 #[derive(Clone)]
-pub struct AppState<C>
-where C:Connection{
+pub struct AppState{
     pub arguments: ServerArguments,
-    pub db: Arc<Mutex<Surreal<C>>>,
+    pub db: Arc<Mutex<Surreal<Any>>>,
     pub embedder: Arc<Mutex<Embedder>>,
 }
 

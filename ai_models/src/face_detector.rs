@@ -1,18 +1,16 @@
 use crate::yolo;
-use burn::backend::wgpu::WgpuDevice;
-use burn::backend::Wgpu;
-use burn::prelude::{Device, TensorData};
 use burn::Tensor;
+use burn::prelude::{Backend, Device, TensorData};
 use image::DynamicImage;
 
-pub struct FaceDetector {
-    pub model: Box<yolo::Model<Wgpu>>,
-    pub device: Device<Wgpu>,
+pub struct FaceDetector<B: Backend> {
+    pub model: yolo::Model<B>,
+    pub device: Device<B>,
 }
 
-impl FaceDetector {
-    pub fn new(model_path: &str, device: Device<Wgpu>) -> Self {
-        let model = Box::new(yolo::Model::from_file(model_path, &device));
+impl<B> FaceDetector<B> where B: Backend {
+    pub fn new(model_path: &str, device: Device<B>) -> Self {
+        let model = yolo::Model::from_file(model_path, &device);
         FaceDetector {
             model,
             device,
@@ -22,7 +20,7 @@ impl FaceDetector {
     /// Detect all faces in an image. returns a vector of cropped face images.
     pub fn detect(&self, img: &DynamicImage) -> Vec<DetectedFace> {
         let scaled_image = scale_image::<640, 640>(img.clone());
-        let input = image_to_tensor(&scaled_image.scaled_image, &self.device);
+        let input = image_to_tensor::<B>(&scaled_image.scaled_image, &self.device);
 
         let output = self.model.forward(input);
 
@@ -113,7 +111,7 @@ pub fn scale_image<const HEIGHT: u32, const WIDTH: u32>(image: DynamicImage) -> 
         base_y: image.height(),
     }
 }
-fn image_to_tensor(image: &DynamicImage, device: &WgpuDevice) -> Tensor<Wgpu, 4> {
+fn image_to_tensor<B: Backend>(image: &image::DynamicImage, device: &Device<B>) -> Tensor<B, 4> {
     let rgb = image.to_rgb8();
     let (width, height) = rgb.dimensions();
 
@@ -130,7 +128,7 @@ fn image_to_tensor(image: &DynamicImage, device: &WgpuDevice) -> Tensor<Wgpu, 4>
 
     let tensor_data = TensorData::new(data, [1, 3, height as usize, width as usize]);
 
-    Tensor::from_data(tensor_data, device)
+    Tensor::<B, 4>::from_data(tensor_data, device)
 }
 
 fn nms(mut boxes: Vec<BBox>, iou_threshold: f32) -> Vec<BBox> {
@@ -175,54 +173,38 @@ pub struct BBox {
 #[cfg(test)]
 mod tests {
     use crate::face_detector::FaceDetector;
-    use crate::yolo;
-    use burn::backend::wgpu::WgpuDevice;
-    use burn::backend::Wgpu;
+    use burn_ndarray::{NdArray, NdArrayDevice};
     use image::open;
-    use std::sync::Arc;
 
     #[test]
     pub fn test_find_faces_group_photo() {
-        let device = WgpuDevice::DefaultDevice;
-        let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
-        let face_detector = FaceDetector {
-            model: Box::new(model),
-            device,
-        };
+        let device = NdArrayDevice::default();
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
-        let image = open("../../test_pictures/pexels-fauxels-3184398.jpg").expect("Failed to open image");
+        let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 7);
     }
 
     #[test]
     pub fn test_find_faces_no_faces() {
-        let device = WgpuDevice::DefaultDevice;
-        let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
-
-        let face_detector = FaceDetector {
-            model: Box::new(model),
-            device,
-        };
+        let device = NdArrayDevice::default();
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image =
-            open("../../test_pictures/apples_food_fresh_fruits_kiwis_oranges_royalty_free_images-974148.jpg")
+            open("../test_pictures/0_1.jpg")
                 .expect("Failed to open image");
         let faces = face_detector.detect(&image);
         assert_eq!(faces.len(), 0);
     }
+
     #[test]
     pub fn test_find_faces_statue() {
-        let device = WgpuDevice::DefaultDevice;
-        let model: yolo::Model<Wgpu> = yolo::Model::from_file("../models/yolo.bpk", &device);
-
-        let face_detector = FaceDetector {
-            model: Box::new(model),
-            device,
-        };
+        let device = NdArrayDevice::default();
+        let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open(
-            "../../test_pictures/angel_architecture_art_close_up_daylight_outdoors_rock_sculpture-1043652.jpg",
+            "../test_pictures/0_2.jpg",
         )
         .expect("Failed to open image");
         let faces = face_detector.detect(&image);

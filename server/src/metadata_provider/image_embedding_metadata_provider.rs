@@ -1,17 +1,17 @@
+use burn::tensor::backend::Backend;
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use ai_models::image_embedder::ImageEmbedder;
 use burn::prelude::Device;
-use burn::backend::Wgpu;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
 
-pub struct ImageEmbeddingMetadataProvider {
-    image_embedder: ImageEmbedder,
+pub struct ImageEmbeddingMetadataProvider<B: Backend> {
+    image_embedder: ImageEmbedder<B>,
 }
 
-impl ImageEmbeddingMetadataProvider {
+impl<B: Backend> ImageEmbeddingMetadataProvider<B> {
     pub fn new(
-        device: Device<Wgpu>,
+        device: Device<B>,
         image_embedder: &str,
     ) -> Self {
         Self {
@@ -25,7 +25,7 @@ pub struct ImageEmbedding {
     pub embedding: Vec<f32>,
 }
 
-impl MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider {
+impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider<B> {
     fn extract(
         &self,
         images: &[BaseImageWithImage],

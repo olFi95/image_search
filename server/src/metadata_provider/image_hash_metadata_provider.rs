@@ -208,7 +208,7 @@ mod tests {
         let base_image_repository = BaseImageRepository::new(db.clone()).await;
         let image_hash_metadata_provider = super::ImageHashMetadataProvider{};
         let image_path = "../test_pictures/0_1.jpg";
-        let base_images: Vec<BaseImage> = vec![image_path]
+        let base_images: Vec<BaseImage> = [image_path]
             .iter()
             .map(|path| BaseImage::new(PathBuf::from(path)))
             .collect();

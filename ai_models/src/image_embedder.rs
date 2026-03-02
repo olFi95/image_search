@@ -1,20 +1,18 @@
+use burn::prelude::{Backend, Device};
+use image::DynamicImage;
 use crate::clip;
 use crate::utils::preprocess_clip;
-use burn::backend::wgpu::WgpuDevice;
-use burn::backend::Wgpu;
-use burn::prelude::Device;
-use image::DynamicImage;
 
-pub struct ImageEmbedder {
-    pub model: Box<clip::Model<Wgpu>>,
-    pub device: Device<Wgpu>,
+pub struct ImageEmbedder<B: Backend> {
+    pub model: clip::Model<B>,
+    pub device: Device<B>,
 }
-impl ImageEmbedder {
-    pub fn new(model_path: &str, device: WgpuDevice) -> Self {
-        let model = Box::new(clip::Model::from_file(
+impl<B: Backend> ImageEmbedder<B> {
+    pub fn new(model_path: &str, device: Device<B>) -> Self {
+        let model = clip::Model::from_file(
             model_path,
             &device,
-        ));
+        );
         ImageEmbedder {
             model,
             device,

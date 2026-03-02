@@ -1,0 +1,102 @@
+name: Rust common setup steps
+description: Setup rust with cached dependencies
+inputs:
+  cargo-deny:
+    description: |
+      Install cargo-deny. Default is false.
+    default: "false"
+  cargo-sbom:
+    description: |
+      Install cargo-sbom. Default is false.
+    default: "false"
+  cargo-tarpaulin:
+    description: |
+      Install cargo-tarpaulin. Default is false.
+    default: "false"
+  cargo-cross:
+    description: |
+      Install cross. Default is false.
+    default: "false"
+  cargo-trunk:
+    description: |
+      Install trunk. Default is false.
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+      id: toolchain
+      with:
+        components: clippy
+        targets: x86_64-unknown-linux-gnu
+
+    - name: Verify Cargo Cache Location
+      shell: bash
+      run: |
+        echo "📦 Cargo Home: ${CARGO_HOME:-$HOME/.cargo}"
+        echo "🔧 Target Dir: ${CARGO_TARGET_DIR:-./target}"
+        
+        # Zeige Cache-Status falls vorhanden
+        if [ -d "${CARGO_HOME:-$HOME/.cargo}/registry" ]; then
+          SIZE=$(du -sh "${CARGO_HOME:-$HOME/.cargo}/registry" 2>/dev/null | cut -f1 || echo "?")
+          echo "✅ Registry cache exists: $SIZE"
+        else
+          echo "ℹ️  Registry cache will be created on first use"
+        fi
+
+    - name: Install cargo-deny
+      shell: bash
+      run: |
+        if ! command -v cargo-deny &> /dev/null; then
+          echo "Installing cargo-deny..."
+          cargo install cargo-deny --locked
+        else
+          echo "cargo-deny already installed"
+        fi
+      if: ${{ inputs.cargo-deny == 'true' }}
+
+    - name: Install cargo-sbom
+      shell: bash
+      run: |
+        if ! command -v cargo-sbom &> /dev/null; then
+          echo "Installing cargo-sbom..."
+          cargo install cargo-sbom --locked
+        else
+          echo "cargo-sbom already installed"
+        fi
+      if: ${{ inputs.cargo-sbom == 'true' }}
+
+    - name: Install cargo-tarpaulin
+      shell: bash
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          echo "Installing cargo-tarpaulin..."
+          cargo install cargo-tarpaulin --locked
+        else
+          echo "cargo-tarpaulin already installed"
+        fi
+      if: ${{ inputs.cargo-tarpaulin == 'true' }}
+
+    - name: Install Cross
+      shell: bash
+      run: |
+        if ! command -v cross &> /dev/null; then
+          echo "Installing cross..."
+          cargo install cross --locked
+        else
+          echo "cross already installed"
+        fi
+      if: ${{ inputs.cargo-cross == 'true' }}
+
+    - name: Install Trunk
+      shell: bash
+      run: |
+        if ! command -v trunk &> /dev/null; then
+          echo "Installing trunk..."
+          cargo install trunk --locked
+        else
+          echo "trunk already installed"
+        fi
+      if: ${{ inputs.cargo-trunk == 'true' }}
