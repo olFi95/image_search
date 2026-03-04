@@ -17,84 +17,11 @@ impl<B> FaceDetector<B> where B: Backend {
         }
     }
 
-    /// Detect all faces in an image. returns a vector of cropped face images.
-    pub fn detect(&self, img: &DynamicImage) -> Vec<DetectedFace> {
-        let scaled_image = scale_image::<640, 640>(img.clone());
-        let input = image_to_tensor::<B>(&scaled_image.scaled_image, &self.device);
-
-        let output = self.model.forward(input);
-
-        let data = output.to_data();
-        let data_slice = data.as_slice::<f32>().expect("Tensor is not f32");
-
-        let num_attrs = 5;
-        let num_anchors = 8400;
-
-        let base = 0; // batch = 0
-        let stride_attr = num_anchors;
-        let stride_batch = num_attrs * num_anchors;
-
-        let mut boxes = Vec::new();
-        let conf_threshold = 0.5;
-
-        for anchor in 0..num_anchors {
-            let offset = base * stride_batch + anchor;
-
-            let x = data_slice[offset];  // + 0 * stride_attr
-            let y = data_slice[offset + stride_attr];  // + 1 * stride_attr
-            let w = data_slice[offset + 2 * stride_attr];
-            let h = data_slice[offset + 3 * stride_attr];
-            let conf = data_slice[offset + 4 * stride_attr];
-
-            if conf < conf_threshold {
-                continue;
-            }
-
-            let (sx, sy) = scaled_image.get_scale_factors();
-            let xmin = (x - w / 2.0) * sx;
-            let ymin = (y - h / 2.0) * sy;
-            let xmax = (x + w / 2.0) * sx;
-            let ymax = (y + h / 2.0) * sy;
-
-            boxes.push(BBox {
-                xmin,
-                ymin,
-                xmax,
-                ymax,
-                score: conf,
-            });
-        }
-        let final_boxes = nms(boxes, 0.45);
-        let mut faces = vec![];
-        for b in &final_boxes {
-            let face = img.clone().crop(
-                b.xmin as u32,
-                b.ymin as u32,
-                (b.xmax - b.xmin) as u32,
-                (b.ymax - b.ymin) as u32,
-            );
-            faces.push(DetectedFace {
-                face_image: face,
-                bbox: b.clone(),
-            });
-        }
-
-        faces
-    }
-
-    /// Detect faces in a batch of images. CPU preprocessing is parallelized,
-    /// then each image is forwarded through the GPU model individually (the ONNX model
-    /// has fixed batch=1 in internal reshapes).
-    /// Returns a Vec of Vec<DetectedFace>, one inner Vec per input image, in the same order.
     pub fn detect_batch(&self, images: &[&DynamicImage]) -> Vec<Vec<DetectedFace>> {
         if images.is_empty() {
             return Vec::new();
         }
-        if images.len() == 1 {
-            return vec![self.detect(images[0])];
-        }
 
-        // Preprocess all images on CPU (scaling + tensor creation)
         let preprocessed: Vec<(Tensor<B, 4>, ResizedImage, &DynamicImage)> = images
             .iter()
             .map(|img| {
@@ -110,7 +37,9 @@ impl<B> FaceDetector<B> where B: Backend {
 
         let mut all_results = Vec::with_capacity(images.len());
 
-        // Forward pass each image individually through GPU
+        // This loop is unfortunately necessary because this model does not support batch inference.
+        // If it did, we could process all images in one forward pass and then split the output accordingly.
+        // Maybe a reexport with batch support could be added in the future.
         for (input, scaled_image, original_img) in preprocessed {
             let output = self.model.forward(input);
             let data = output.to_data();
@@ -161,7 +90,7 @@ impl<B> FaceDetector<B> where B: Backend {
 
 pub struct DetectedFace {
     pub face_image: DynamicImage,
-    pub bbox: BBox, // Bounding box in the original image
+    pub bbox: BBox,
 }
 
 pub struct ResizedImage {
@@ -258,7 +187,7 @@ mod tests {
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect(&image);
+        let faces = face_detector.detect_batch(&[&image]);
         assert_eq!(faces.len(), 7);
     }
 
@@ -270,8 +199,9 @@ mod tests {
         let image =
             open("../test_pictures/0_1.jpg")
                 .expect("Failed to open image");
-        let faces = face_detector.detect(&image);
-        assert_eq!(faces.len(), 0);
+        let images_with_faces = face_detector.detect_batch(&[&image]);
+        assert_eq!(images_with_faces.len(), 1);
+        assert_eq!(images_with_faces[0].len(), 0);
     }
 
     #[test]
@@ -280,13 +210,13 @@ mod tests {
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open("../test_pictures/1_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect(&image);
-        assert_eq!(faces.len(), 1);
-        assert!(faces[0].bbox.score > 0.5);
-        assert!((faces[0].bbox.xmin - 318.8).abs() < 5.0);
-        assert!((faces[0].bbox.ymin - 158.8).abs() < 5.0);
-        assert!((faces[0].bbox.xmax - 479.0).abs() < 5.0);
-        assert!((faces[0].bbox.ymax - 398.3).abs() < 5.0);
+        let image_with_face = face_detector.detect_batch(&[&image])[0];
+        assert_eq!(image_with_face.len(), 1);
+        assert!(image_with_face[0].bbox.score > 0.5);
+        assert!((image_with_face[0].bbox.xmin - 318.8).abs() < 5.0);
+        assert!((image_with_face[0].bbox.ymin - 158.8).abs() < 5.0);
+        assert!((image_with_face[0].bbox.xmax - 479.0).abs() < 5.0);
+        assert!((image_with_face[0].bbox.ymax - 398.3).abs() < 5.0);
     }
 
     #[test]
@@ -295,9 +225,10 @@ mod tests {
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open("../test_pictures/3_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect(&image);
-        assert_eq!(faces.len(), 3);
-        for face in &faces {
+        let images_with_faces = face_detector.detect_batch(&[&image]);
+        assert_eq!(images_with_faces.len(), 1);
+        assert_eq!(images_with_faces[0].len(), 3);
+        for face in &images_with_faces[0] {
             assert!(face.bbox.score > 0.5);
         }
     }
@@ -311,7 +242,8 @@ mod tests {
             "../test_pictures/0_2.jpg",
         )
         .expect("Failed to open image");
-        let faces = face_detector.detect(&image);
-        assert_eq!(faces.len(), 0);
+        let faces = face_detector.detect_batch(&[&image]);
+        assert_eq!(faces.len(), 1);
+        assert_eq!(faces[0].len(), 0);
     }
 }
