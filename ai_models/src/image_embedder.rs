@@ -1,9 +1,8 @@
-use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::ParallelIterator;
-use burn::tensor::module::embedding;
 use burn::Tensor;
 use burn::prelude::{Backend, Device};
 use image::DynamicImage;
+use rayon::prelude::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 use crate::clip;
 use crate::utils::preprocess_clip;
 
@@ -49,7 +48,7 @@ impl<B: Backend> ImageEmbedder<B> {
             .unwrap();
 
         let batch_size = images.len();
-        let dim = 768;
+        let dim = data.len()/batch_size;
 
         (0..batch_size)
             .map(|i| {

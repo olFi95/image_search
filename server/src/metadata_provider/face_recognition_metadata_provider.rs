@@ -184,7 +184,7 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
             return Ok(Vec::new());
         }
 
-        let embeddings = self.face_embedder.embed_batch(&valid_faces);
+        let embeddings = self.face_embedder.embed(&valid_faces);
 
         let results: Vec<Metadata<FaceInPictureVector>> = valid_ids
             .into_iter()

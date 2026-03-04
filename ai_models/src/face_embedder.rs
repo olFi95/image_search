@@ -2,6 +2,8 @@ use crate::arcface;
 use burn::Tensor;
 use burn::prelude::{Backend, Device};
 use image::DynamicImage;
+use rayon::prelude::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 
 pub struct FaceEmbedder<B: Backend> {
     pub model: arcface::Model<B>,
@@ -20,40 +22,38 @@ impl <B: Backend>FaceEmbedder<B> {
         }
     }
 
-    /// Generate face embedding from a cropped face image.
-    pub fn embed(&self, face_image: DynamicImage) -> Vec<f32> {
-        let preprocessed_face = Self::preprocess_arcface(&face_image);
-        let embedding = self.model.forward(preprocessed_face);
-        let embedding = embedding.reshape([512]);
-        let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
-        let embedding = embedding / norm;
-        embedding.to_data().as_slice::<f32>().unwrap().to_vec()
-    }
 
-    /// Generate face embeddings for a batch of cropped face images.
-    /// Each image is forwarded individually (ONNX models have fixed batch=1 reshapes),
-    /// but preprocessing is collected upfront for better cache locality.
-    /// Returns one Vec<f32> (length 512) per face, in the same order as the input.
-    pub fn embed_batch(&self, face_images: &[DynamicImage]) -> Vec<Vec<f32>> {
+    pub fn embed(&self, face_images: &[DynamicImage]) -> Vec<Vec<f32>> {
         if face_images.is_empty() {
             return Vec::new();
         }
 
-        // Preprocess all faces on CPU first
         let preprocessed: Vec<Tensor<B, 4>> = face_images
-            .iter()
+            .par_iter()
             .map(|img| Self::preprocess_arcface(img))
             .collect();
+        let batch = Tensor::cat(preprocessed, 0);
+        let embeddings = self.model.forward(batch);
+        let norms = (embeddings.clone() * embeddings.clone())
+            .sum_dim(1)
+            .sqrt();
 
-        // Forward each through GPU individually and normalize
-        preprocessed
-            .into_iter()
-            .map(|tensor| {
-                let embedding = self.model.forward(tensor);
-                let embedding = embedding.reshape([512]);
-                let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
-                let embedding = embedding / norm;
-                embedding.to_data().as_slice::<f32>().unwrap().to_vec()
+        let normalized = embeddings / norms;
+
+        let binding = normalized
+            .to_data();
+        let data = binding
+            .as_slice::<f32>()
+            .unwrap();
+
+        let batch_size = face_images.len();
+        let dim = data.len()/batch_size;
+
+        (0..batch_size)
+            .map(|i| {
+                let start = i * dim;
+                let end = start + dim;
+                data[start..end].to_vec()
             })
             .collect()
     }
