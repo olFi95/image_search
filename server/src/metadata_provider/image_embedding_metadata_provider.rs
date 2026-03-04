@@ -36,7 +36,7 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageE
         }
 
         let image_refs: Vec<&image::DynamicImage> = images.iter().map(|img| &img.image).collect();
-        let embeddings = self.image_embedder.embed_batch(&image_refs);
+        let embeddings = self.image_embedder.embed(&image_refs);
 
         let results: Vec<Metadata<ImageEmbedding>> = images
             .iter()
