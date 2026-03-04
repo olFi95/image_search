@@ -1,3 +1,7 @@
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
+use burn::tensor::module::embedding;
+use burn::Tensor;
 use burn::prelude::{Backend, Device};
 use image::DynamicImage;
 use crate::clip;
@@ -27,30 +31,104 @@ impl<B: Backend> ImageEmbedder<B> {
         embedding.to_data().as_slice::<f32>().unwrap().to_vec()
     }
 
-    /// Embed a batch of images. Each image is forwarded individually through the GPU
-    /// (ONNX models have fixed batch=1 reshapes), but CPU preprocessing is collected upfront.
-    /// Returns one Vec<f32> (length 768) per image, in the same order as the input.
     pub fn embed_batch(&self, images: &[&DynamicImage]) -> Vec<Vec<f32>> {
         if images.is_empty() {
             return Vec::new();
         }
 
-        // Preprocess all images on CPU first
         let preprocessed: Vec<_> = images
-            .iter()
+            .par_iter()
             .map(|img| preprocess_clip(img))
             .collect();
+        let batch = Tensor::cat(preprocessed, 0);
 
-        // Forward each through GPU individually and normalize
-        preprocessed
-            .into_iter()
-            .map(|tensor| {
-                let embedding = self.model.forward(tensor);
-                let embedding = embedding.reshape([768]);
-                let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
-                let embedding = embedding / norm;
-                embedding.to_data().as_slice::<f32>().unwrap().to_vec()
+        let embeddings = self.model.forward(batch);
+
+        let norms = (embeddings.clone() * embeddings.clone())
+            .sum_dim(1)
+            .sqrt();
+
+        let normalized = embeddings / norms;
+
+        let binding = normalized
+            .to_data();
+        let data = binding
+            .as_slice::<f32>()
+            .unwrap();
+
+        let batch_size = images.len();
+        let dim = 768;
+
+        (0..batch_size)
+            .map(|i| {
+                let start = i * dim;
+                let end = start + dim;
+                data[start..end].to_vec()
             })
             .collect()
+    }}
+#[cfg(test)]
+mod tests {
+    use crate::image_embedder::ImageEmbedder;
+    use burn_ndarray::{NdArray, NdArrayDevice};
+    use image::open;
+
+    fn l2_norm(v: &[f32]) -> f32 {
+        v.iter().map(|x| x * x).sum::<f32>().sqrt()
+    }
+
+    const MODEL_PATH: &'static str = "../models/vision_model.bpk";
+
+    #[test]
+    fn test_embed_batch_three_images_shape_and_norm() {
+        let device = NdArrayDevice::default();
+        let image_embedder = ImageEmbedder::<NdArray>::new(MODEL_PATH, device);
+
+        let img1 = open("../test_pictures/1_1.jpg").unwrap();
+        let img2 = open("../test_pictures/3_1.jpg").unwrap();
+        let img3 = open("../test_pictures/7_1.jpg").unwrap();
+
+        let embeddings: Vec<Vec<f32>> = image_embedder.embed_batch(&[&img1, &img2, &img3]);
+
+        assert_eq!(embeddings.len(), 3);
+
+        for emb in &embeddings {
+            assert_eq!(emb.len(), 768);
+
+            let norm = l2_norm(emb);
+            assert!((norm - 1.0).abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn test_embed_batch_different_images_produce_different_embeddings() {
+        let device = NdArrayDevice::default();
+        let image_embedder = ImageEmbedder::<NdArray>::new(MODEL_PATH, device);
+        let img1 = open("../test_pictures/1_1.jpg").unwrap();
+        let img2 = open("../test_pictures/0_1.jpg").unwrap();
+        let img3 = open("../test_pictures/3_1.jpg").unwrap();
+
+        let embeddings: Vec<Vec<f32>> = image_embedder.embed_batch(&[&img1, &img2, &img3]);
+
+        assert_eq!(embeddings.len(), 3);
+
+        fn dot(a: &[f32], b: &[f32]) -> f32 {
+            a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+        }
+
+        let sim_12 = dot(&embeddings[0], &embeddings[1]);
+        let sim_13 = dot(&embeddings[0], &embeddings[2]);
+
+        assert!(sim_12 < 0.99);
+        assert!(sim_13 < 0.99);
+    }
+
+    #[test]
+    fn test_embed_batch_empty_input() {
+        let device = NdArrayDevice::default();
+        let image_embedder = ImageEmbedder::<NdArray>::new(MODEL_PATH, device);
+
+        let embeddings = image_embedder.embed_batch(&[]);
+        assert!(embeddings.is_empty());
     }
 }

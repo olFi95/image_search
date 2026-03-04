@@ -107,6 +107,7 @@ dependencies = [
  "hf-hub 0.5.0",
  "image",
  "onnx_updater",
+ "rayon",
  "tokio",
 ]
 
