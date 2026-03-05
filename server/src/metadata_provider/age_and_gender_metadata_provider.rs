@@ -76,7 +76,7 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for
         }
 
         let face_refs: Vec<&image::DynamicImage> = valid_face_images.iter().collect();
-        let batch_results = self.face_age_and_gender_estimator.embed(&face_refs);
+        let batch_results = self.face_age_and_gender_estimator.estimate_age_and_gender(&face_refs);
 
         let results: Vec<Metadata<FaceAgeAndGender>> = valid_ids
             .into_iter()

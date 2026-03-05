@@ -22,7 +22,7 @@ impl<B: Backend> FaceAgeAndGenderEstimator<B> {
         }
     }
 
-    pub fn embed(&self, face_images: &[&DynamicImage]) -> Vec<Vec<f32>> {
+    pub fn estimate_age_and_gender(&self, face_images: &[&DynamicImage]) -> Vec<Vec<f32>> {
         if face_images.is_empty() {
             return Vec::new();
         }

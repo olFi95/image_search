@@ -33,6 +33,7 @@ impl TryInto<BaseImageWithImage> for BaseImage {
     }
 }
 
+#[derive(Clone)]
 pub struct BaseImageWithImage {
     pub base_image: BaseImage,
     pub image: DynamicImage,
