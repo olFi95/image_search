@@ -10347,6 +10347,7 @@ dependencies = [
  "candle-transformers",
  "chrono",
  "clap",
+ "crossbeam-channel",
  "data",
  "embed_anything",
  "env_logger",

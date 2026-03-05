@@ -15,6 +15,7 @@ ai_models = { path = "../ai_models" , features = ["yolo","age_gender", "arcface"
 
 axum = { workspace = true }
 chrono = { workspace = true }
+crossbeam-channel = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }
 tokio = { workspace = true }
