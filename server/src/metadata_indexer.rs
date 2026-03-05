@@ -6,9 +6,7 @@ use crate::metadata_provider::basic_metadata_provider::{BasicMetadata, BasicMeta
 use crate::metadata_provider::face_recognition_metadata_provider::{
     FaceRecognitionMetadataProvider, FaceRecognitionMetadataRepository,
 };
-use crate::metadata_provider::image_embedding_metadata_provider::{
-    ImageEmbeddingMetadataProvider, ImageEmbeddingMetadataRepository,
-};
+use crate::metadata_provider::image_embedding_metadata_provider::{ImageEmbedding, ImageEmbeddingMetadataProvider, ImageEmbeddingMetadataRepository};
 use crate::metadata_provider::image_hash_metadata_provider::{ImageHashMetadata, ImageHashMetadataProvider, ImageHashMetadataRepository};
 use crate::metadata_provider::model::{BaseImage, BaseImageRepository, BaseImageWithImage, Metadata, MetadataProvider};
 use burn::tensor::Device;
@@ -71,15 +69,11 @@ where
         //     self.device.clone(),
         //     self.face_age_and_gender.as_str(),
         // );
-        // let image_embedding_metadata_provider: ImageEmbeddingMetadataProvider<B> =
-        //     ImageEmbeddingMetadataProvider::new(self.device.clone(), self.image_embedder.as_str());
         // // Metadata Repositories
         // let face_recognition_metadata_repository =
         //     FaceRecognitionMetadataRepository::new(self.db.clone()).await;
         // let face_age_and_gender_metadata_repository =
         //     FaceAgeAndGenderMetadataRepository::new(self.db.clone()).await;
-        // let image_embedding_metadata_repository =
-        //     ImageEmbeddingMetadataRepository::new(self.db.clone()).await;
 
         let all_image_paths: Vec<PathBuf> = get_all_directories_in_dir(&path)
             .par_iter()
@@ -127,7 +121,6 @@ where
         };
 
         let (tx_loaded, rx_loaded) = bounded::<BaseImageWithImage>(BUFFER);
-
         let image_loader = thread::spawn(move || {
             loop {
                 let batch = collect_batch(&rx_base_with_id, BATCH);
@@ -150,12 +143,13 @@ where
 
         let (tx_hash, rx_hash) = bounded::<Metadata<ImageHashMetadata>>(BUFFER);
         let (tx_basic, rx_basic) = bounded::<Metadata<BasicMetadata>>(BUFFER);
+        let value = rx_loaded.clone();
         let extractor = thread::spawn(move || {
             let image_hash_metadata_provider = ImageHashMetadataProvider;
             let basic_metadata_provider = BasicMetadataProvider;
 
             loop {
-                let batch = collect_batch(&rx_loaded, BATCH);
+                let batch = collect_batch(&value, BATCH);
                 trace!("extracting basic and hash metadata for batch of {} images", batch.len());
                 if batch.is_empty() { break; }
 
@@ -178,8 +172,8 @@ where
             tokio::spawn(async move {
                 loop {
                     let batch = collect_batch(&rx_hash, BATCH);
-                    if batch.is_empty() { break; }
                     trace!("saving batch of {} image hashes", batch.len());
+                    if batch.is_empty() { break; }
 
                     repo.insert_many(&batch).await.unwrap();
                 }
@@ -192,21 +186,70 @@ where
             tokio::spawn(async move {
                 loop {
                     let batch = collect_batch(&rx_basic, BATCH);
-                    if batch.is_empty() { break; }
                     trace!("saving batch of {} basic metadata entries", batch.len());
+                    if batch.is_empty() { break; }
 
                     repo.insert_many(&batch).await.unwrap();
                 }
             })
         };
 
+        let image_embedder_device = self.device.clone();
+        let image_embedder_model = self.image_embedder.clone();
+        let (tx_image_embedding, rx_image_embedding) = bounded::<Metadata<ImageEmbedding>>(BUFFER);
+        let image_embedder = thread::Builder::new()
+            .name("image_embedder".into())
+            .stack_size(32 * 1024 * 1024)
+            .spawn(move || {
+            let image_embedding_metadata_provider: ImageEmbeddingMetadataProvider<B> =
+                ImageEmbeddingMetadataProvider::new(image_embedder_device, image_embedder_model.as_str());
+            loop {
+                let batch = collect_batch(&rx_loaded, BATCH);
+                trace!("embedding batch of {} images", batch.len());
+                if batch.is_empty() { break; }
+                let embeddings = image_embedding_metadata_provider.extract(&batch).expect("cannot embed images");
+                for embedding in embeddings {
+                    if tx_image_embedding.send(embedding).is_err() { break; }
+                }
+            }
+        }).expect("cannot spawn image_embedder thread");
+
+        let embedding_saver = {
+            let image_embedding_metadata_repository =
+                ImageEmbeddingMetadataRepository::new(self.db.clone()).await;
+
+            tokio::spawn(async move {
+                loop {
+                    let batch = collect_batch(&rx_image_embedding, BATCH);
+                    trace!("saving batch of {} image embeddings", batch.len());
+                    if batch.is_empty() { break; }
+
+                    image_embedding_metadata_repository.insert_many_image_embeddings(&batch).await.unwrap();
+                }
+            })
+        };
+
+
+        //     tokio::spawn(async move {
+        //     //     // --- GPU work: image embedding (batched) ---
+        //     //     let t = Instant::now();
+        //         let image_embeddings = image_embedding_metadata_provider
+        //             .extract(&base_images_with_image)
+        //             .expect("cannot embed images");
+        //         trace!("Image embedding (GPU, batched): {:?}", t.elapsed());
+        //
+        // });
+
+
         producer.join().unwrap();
         image_loader.join().unwrap();
         extractor.join().unwrap();
+        image_embedder.join().unwrap();
 
         saver.await.unwrap();
         hash_saver.await.unwrap();
         basic_saver.await.unwrap();
+        embedding_saver.await.unwrap();
 
 
         info!(
