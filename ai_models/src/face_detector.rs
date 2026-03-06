@@ -187,8 +187,9 @@ mod tests {
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect_batch(&[&image]);
-        assert_eq!(faces.len(), 7);
+        let images = face_detector.detect_batch(&[&image]);
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].len(), 7);
     }
 
     #[test]
@@ -210,7 +211,7 @@ mod tests {
         let face_detector = FaceDetector::<NdArray>::new("../models/yolo.bpk", device);
 
         let image = open("../test_pictures/1_1.jpg").expect("Failed to open image");
-        let image_with_face = face_detector.detect_batch(&[&image])[0];
+        let image_with_face = &face_detector.detect_batch(&[&image])[0];
         assert_eq!(image_with_face.len(), 1);
         assert!(image_with_face[0].bbox.score > 0.5);
         assert!((image_with_face[0].bbox.xmin - 318.8).abs() < 5.0);

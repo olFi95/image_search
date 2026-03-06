@@ -1,9 +1,9 @@
 use crate::arcface;
-use burn::Tensor;
 use burn::prelude::{Backend, Device};
+use burn::Tensor;
 use image::DynamicImage;
-use rayon::prelude::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
 
 pub struct FaceEmbedder<B: Backend> {
     pub model: arcface::Model<B>,
@@ -84,6 +84,7 @@ impl <B: Backend>FaceEmbedder<B> {
 
 #[cfg(test)]
 mod tests {
+    use std::slice::from_ref;
     use crate::face_detector::FaceDetector;
     use crate::face_embedder::FaceEmbedder;
     use burn_ndarray::{NdArray, NdArrayDevice};
@@ -97,10 +98,11 @@ mod tests {
         let face_embedder = FaceEmbedder::<NdArray>::new("../models/arcface_model.bpk", device);
 
         let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect(&image);
+        let images_with_faces = face_detector.detect_batch(&[&image]);
+        assert_eq!(images_with_faces.len(), 1);
         let mut embeddings = Vec::new();
-        for face in faces {
-            embeddings.push(face_embedder.embed(face.face_image));
+        for faces in &images_with_faces[0] {
+            embeddings.push(face_embedder.embed(from_ref(&faces.face_image)));
         }
         assert_eq!(embeddings.len(), 7);
     }

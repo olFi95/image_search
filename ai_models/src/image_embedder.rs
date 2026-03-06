@@ -1,10 +1,10 @@
-use burn::Tensor;
-use burn::prelude::{Backend, Device};
-use image::DynamicImage;
-use rayon::prelude::IntoParallelRefIterator;
-use rayon::iter::ParallelIterator;
 use crate::clip;
 use crate::utils::preprocess_clip;
+use burn::prelude::{Backend, Device};
+use burn::Tensor;
+use image::DynamicImage;
+use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
 
 pub struct ImageEmbedder<B: Backend> {
     pub model: clip::Model<B>,
@@ -68,7 +68,7 @@ mod tests {
         v.iter().map(|x| x * x).sum::<f32>().sqrt()
     }
 
-    const MODEL_PATH: &'static str = "../models/vision_model.bpk";
+    const MODEL_PATH: &str = "../models/vision_model.bpk";
 
     #[test]
     fn test_embed_batch_three_images_shape_and_norm() {
@@ -79,7 +79,7 @@ mod tests {
         let img2 = open("../test_pictures/3_1.jpg").unwrap();
         let img3 = open("../test_pictures/7_1.jpg").unwrap();
 
-        let embeddings: Vec<Vec<f32>> = image_embedder.embed_batch(&[&img1, &img2, &img3]);
+        let embeddings: Vec<Vec<f32>> = image_embedder.embed(&[&img1, &img2, &img3]);
 
         assert_eq!(embeddings.len(), 3);
 
@@ -99,7 +99,7 @@ mod tests {
         let img2 = open("../test_pictures/0_1.jpg").unwrap();
         let img3 = open("../test_pictures/3_1.jpg").unwrap();
 
-        let embeddings: Vec<Vec<f32>> = image_embedder.embed_batch(&[&img1, &img2, &img3]);
+        let embeddings: Vec<Vec<f32>> = image_embedder.embed(&[&img1, &img2, &img3]);
 
         assert_eq!(embeddings.len(), 3);
 
@@ -119,7 +119,7 @@ mod tests {
         let device = NdArrayDevice::default();
         let image_embedder = ImageEmbedder::<NdArray>::new(MODEL_PATH, device);
 
-        let embeddings = image_embedder.embed_batch(&[]);
+        let embeddings = image_embedder.embed(&[]);
         assert!(embeddings.is_empty());
     }
 }
