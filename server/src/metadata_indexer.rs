@@ -73,12 +73,18 @@ where
             tokio::spawn(async move {
                 for path in all_image_paths {
                     let base = BaseImage::new(path);
-
+                    let mut last_log_time = Instant::now();
+                    let mut yielded_times = 0;
                     loop {
                         match tx_base_image.try_send(base.clone()) {
                             Ok(_) => break,
                             Err(err) if err.is_full() => {
-                                trace!("Producer waiting, send-queue full");
+                                if last_log_time.elapsed().as_secs() >= 5 {
+                                    trace!("Producer waiting, send-queue full. yielded {yielded_times} times.");
+                                    last_log_time = Instant::now();
+                                } else {
+                                    yielded_times+=1;
+                                }
                                 tokio::task::yield_now().await;
                             }
                             Err(err) => {
@@ -140,12 +146,20 @@ where
                         .collect();
 
                     for img in loaded_images {
-                        // Non-blocking send mit yield
+                        let mut last_log_time = Instant::now();
+                        let mut yielded_times = 0;
+
                         loop {
                             match tx_loaded.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    trace!("image_loader waiting, send-queue full");
+                                    if last_log_time.elapsed().as_secs() >= 5 {
+                                        trace!("image_loader waiting, send-queue full. yielded {yielded_times} times.");
+                                        last_log_time = Instant::now();
+                                    } else {
+                                        yielded_times+=1;
+                                    }
+
                                     tokio::task::yield_now().await;
                                 }
                                 Err(err) => {
@@ -183,11 +197,19 @@ where
 
                     for img in batch {
                         for tx in [&tx_for_embedding, &tx_for_basic_metadata, &tx_for_face] {
+                            let mut last_log_time = Instant::now();
+                            let mut yielded_times = 0;
+
                             loop {
                                 match tx.try_send(img.clone()) {
                                     Ok(_) => break,
                                     Err(err) if err.is_full() => {
-                                        trace!("image_dispatcher waiting, send-queue full");
+                                        if last_log_time.elapsed().as_secs() >= 5 {
+                                            trace!("image_dispatcher waiting, send-queue full. yielded {yielded_times} times.");
+                                            last_log_time = Instant::now();
+                                        } else {
+                                            yielded_times+=1;
+                                        }
                                         tokio::task::yield_now().await;
                                     }
                                     Err(err) => {
