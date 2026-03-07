@@ -68,7 +68,6 @@ where
 
         let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
         let producer = {
-            let tx_base_image = tx_base_image.clone();
             tokio::spawn(async move {
                 for path in all_image_paths {
                     let base = BaseImage::new(path);
@@ -128,7 +127,6 @@ where
         let (tx_for_face, rx_for_face) = bounded::<BaseImageWithImage>(BUFFER);
 
         let image_loader = {
-            let tx_loaded = tx_loaded.clone();
             tokio::spawn(async move {
                 loop {
                     trace!("image_loader waiting for entries");
@@ -347,7 +345,6 @@ where
         let image_embedder_model = self.image_embedder.clone();
         let (tx_image_embedding, rx_image_embedding) = bounded::<Metadata<ImageEmbedding>>(BUFFER);
         let image_embedder = {
-            let tx_image_embedding = tx_image_embedding.clone();
             tokio::spawn(async move {
                 let provider: ImageEmbeddingMetadataProvider<B> =
                     ImageEmbeddingMetadataProvider::new(image_embedder_device, image_embedder_model.as_str());
@@ -410,8 +407,6 @@ where
                 face_detection_model.as_str(),
                 face_embedding_model.as_str(),
             );
-            let tx_face_for_db = tx_face_for_db.clone();
-            let tx_face_embedding = tx_face_embedding.clone();
 
             tokio::spawn(async move {
                 loop {
@@ -496,7 +491,6 @@ where
         let face_age_gender_model = self.face_age_and_gender.clone();
         let (tx_age_gender, rx_age_gender) = bounded::<Metadata<FaceAgeAndGender>>(BUFFER);
         let age_gender_estimator = {
-            let tx_age_gender = tx_age_gender.clone();
             tokio::spawn(async move {
                 let provider: AgeAndGenderMetadataProvider<B> =
                     AgeAndGenderMetadataProvider::new(face_age_gender_device, face_age_gender_model.as_str());
