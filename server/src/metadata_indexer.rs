@@ -93,7 +93,7 @@ where
                         }
                     }
                 }
-
+                trace!("drop(tx_base_image)");
                 drop(tx_base_image);
             })
         };
@@ -116,6 +116,8 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_base_with_id)");
+
                 drop(tx_base_with_id)
             })
         };
@@ -170,6 +172,7 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_loaded)");
 
                 drop(tx_loaded);
             })
@@ -204,16 +207,17 @@ where
                                         trace!("image_dispatcher waiting, tx_for_embedding-queue full. slept {yielded_times} ms.");
                                         last_log_time = Instant::now();
                                     } else {
-                                        yielded_times+=1;
+                                        yielded_times += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
-
                                 }
                                 Err(err) => {
                                     error!("image_dispatcher send error: {:?}", err);
                                     break;
                                 }
                             }
+                        }
+                        loop {
                             match tx_for_basic_metadata.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
@@ -221,16 +225,17 @@ where
                                         trace!("image_dispatcher waiting, tx_for_basic_metadata-queue full. slept {yielded_times} ms.");
                                         last_log_time = Instant::now();
                                     } else {
-                                        yielded_times+=1;
+                                        yielded_times += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
-
                                 }
                                 Err(err) => {
                                     error!("image_dispatcher send error: {:?}", err);
                                     break;
                                 }
                             }
+                        }
+                        loop {
                             match tx_for_face.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
@@ -238,7 +243,7 @@ where
                                         trace!("image_dispatcher waiting, tx_for_face-queue full. slept {yielded_times} ms.");
                                         last_log_time = Instant::now();
                                     } else {
-                                        yielded_times+=1;
+                                        yielded_times += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
                                 }
@@ -250,6 +255,9 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_for_embedding)");
+                trace!("drop(tx_for_basic_metadata)");
+                trace!("drop(tx_for_face)");
 
                 drop(tx_for_embedding);
                 drop(tx_for_basic_metadata);
@@ -328,6 +336,8 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_hash)");
+                trace!("drop(tx_basic)");
 
                 drop(tx_hash);
                 drop(tx_basic);
@@ -382,6 +392,7 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_image_embedding)");
 
                 drop(tx_image_embedding);
             })
@@ -447,6 +458,8 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_face_for_db)");
+                trace!("drop(tx_face_embedding)");
 
                 drop(tx_face_for_db);
                 drop(tx_face_embedding);
@@ -472,7 +485,10 @@ where
                                 break;
                             }
                         }
-                    }                }
+                    }
+                }
+                trace!("drop(tx_face_for_age_gender_with_id)");
+
                 drop(tx_face_for_age_gender_with_id);
             })
         };
@@ -515,6 +531,7 @@ where
                         }
                     }
                 }
+                trace!("drop(tx_age_gender)");
 
                 drop(tx_age_gender);
             })
