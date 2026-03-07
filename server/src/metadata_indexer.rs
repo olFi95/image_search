@@ -260,12 +260,15 @@ where
         let (tx_hash, rx_hash) = bounded::<Metadata<ImageHashMetadata>>(BUFFER);
         let (tx_basic, rx_basic) = bounded::<Metadata<BasicMetadata>>(BUFFER);
         let basic_extractor = {
-            let tx_hash = tx_hash.clone();
-            let tx_basic = tx_basic.clone();
 
             tokio::spawn(async move {
                 let image_hash_provider = ImageHashMetadataProvider;
                 let basic_provider = BasicMetadataProvider;
+
+                let mut last_log_time_hash = Instant::now();
+                let mut yielded_times_hash = 0;
+                let mut last_log_time_basic = Instant::now();
+                let mut yielded_times_basic = 0;
 
                 loop {
                     trace!("basic_extractor waiting for entries");
@@ -286,7 +289,12 @@ where
                             match tx_hash.try_send(h.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    trace!("basic_extractor (hash) waiting, send-queue full");
+                                    if last_log_time_hash.elapsed().as_secs() >= 5 {
+                                        trace!("basic_extractor (hash) waiting, tx_hash-queue full. slept {yielded_times_hash} ms.");
+                                        last_log_time_hash = Instant::now();
+                                    } else {
+                                        yielded_times_hash+=1;
+                                    }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
 
                                 }
@@ -303,7 +311,12 @@ where
                             match tx_basic.try_send(b.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    trace!("basic_extractor (basic) waiting, send-queue full");
+                                    if last_log_time_basic.elapsed().as_secs() >= 5 {
+                                        trace!("basic_extractor (basic) waiting, tx_basic-queue full. slept {yielded_times_basic} ms.");
+                                        last_log_time_basic = Instant::now();
+                                    } else {
+                                        yielded_times_basic+=1;
+                                    }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
 
                                 }
