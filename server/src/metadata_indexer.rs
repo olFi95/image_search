@@ -79,7 +79,7 @@ where
                             Ok(_) => break,
                             Err(err) if err.is_full() => {
                                 if last_log_time.elapsed().as_secs() >= 5 {
-                                    trace!("Producer waiting, send-queue full. yielded {yielded_times} times.");
+                                    trace!("Producer waiting, send-queue full. slept {yielded_times} ms.");
                                     last_log_time = Instant::now();
                                 } else {
                                     yielded_times+=1;
@@ -153,7 +153,7 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_loader waiting, send-queue full. yielded {yielded_times} times.");
+                                        trace!("image_loader waiting, send-queue full. slept {yielded_times} ms.");
                                         last_log_time = Instant::now();
                                     } else {
                                         yielded_times+=1;
@@ -205,7 +205,7 @@ where
                                     Ok(_) => break,
                                     Err(err) if err.is_full() => {
                                         if last_log_time.elapsed().as_secs() >= 5 {
-                                            trace!("image_dispatcher waiting, send-queue full. yielded {yielded_times} times.");
+                                            trace!("image_dispatcher waiting, send-queue full. slept {yielded_times} ms.");
                                             last_log_time = Instant::now();
                                         } else {
                                             yielded_times+=1;
