@@ -176,19 +176,16 @@ where
         };
 
         let image_dispatcher = {
-            let tx_for_embedding = tx_for_embedding.clone();
-            let tx_for_basic_metadata = tx_for_basic_metadata.clone();
-            let tx_for_face = tx_for_face.clone();
 
             tokio::spawn(async move {
                 loop {
                     trace!("image_dispatcher waiting for entries");
                     let batch = collect_batch_async(&rx_loaded, BATCH).await;
                     trace!(
-                "image_dispatcher distributing batch of {} images, {} in queue",
-                batch.len(),
-                rx_loaded.len()
-            );
+                        "image_dispatcher distributing batch of {} images, {} in queue",
+                        batch.len(),
+                        rx_loaded.len()
+                    );
 
                     if batch.is_empty() {
                         error!("image_dispatcher error while receiving");
@@ -196,27 +193,58 @@ where
                     }
 
                     for img in batch {
-                        for tx in [&tx_for_embedding, &tx_for_basic_metadata, &tx_for_face] {
-                            let mut last_log_time = Instant::now();
-                            let mut yielded_times = 0;
+                        let mut last_log_time = Instant::now();
+                        let mut yielded_times = 0;
 
-                            loop {
-                                match tx.try_send(img.clone()) {
-                                    Ok(_) => break,
-                                    Err(err) if err.is_full() => {
-                                        if last_log_time.elapsed().as_secs() >= 5 {
-                                            trace!("image_dispatcher waiting, send-queue full. slept {yielded_times} ms.");
-                                            last_log_time = Instant::now();
-                                        } else {
-                                            yielded_times+=1;
-                                        }
-                                        tokio::time::sleep(Duration::from_millis(1)).await;
+                        loop {
+                            match tx_for_embedding.try_send(img.clone()) {
+                                Ok(_) => break,
+                                Err(err) if err.is_full() => {
+                                    if last_log_time.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_embedding-queue full. slept {yielded_times} ms.");
+                                        last_log_time = Instant::now();
+                                    } else {
+                                        yielded_times+=1;
+                                    }
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
 
+                                }
+                                Err(err) => {
+                                    error!("image_dispatcher send error: {:?}", err);
+                                    break;
+                                }
+                            }
+                            match tx_for_basic_metadata.try_send(img.clone()) {
+                                Ok(_) => break,
+                                Err(err) if err.is_full() => {
+                                    if last_log_time.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_basic_metadata-queue full. slept {yielded_times} ms.");
+                                        last_log_time = Instant::now();
+                                    } else {
+                                        yielded_times+=1;
                                     }
-                                    Err(err) => {
-                                        error!("image_dispatcher send error: {:?}", err);
-                                        break;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
+                                }
+                                Err(err) => {
+                                    error!("image_dispatcher send error: {:?}", err);
+                                    break;
+                                }
+                            }
+                            match tx_for_face.try_send(img.clone()) {
+                                Ok(_) => break,
+                                Err(err) if err.is_full() => {
+                                    if last_log_time.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_face-queue full. slept {yielded_times} ms.");
+                                        last_log_time = Instant::now();
+                                    } else {
+                                        yielded_times+=1;
                                     }
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+                                }
+                                Err(err) => {
+                                    error!("image_dispatcher send error: {:?}", err);
+                                    break;
                                 }
                             }
                         }
@@ -300,6 +328,8 @@ where
             tokio::spawn(async move {
                 let provider: ImageEmbeddingMetadataProvider<B> =
                     ImageEmbeddingMetadataProvider::new(image_embedder_device, image_embedder_model.as_str());
+                let mut last_log_time = Instant::now();
+                let mut yielded_times = 0;
 
                 loop {
                     trace!("image_embedder waiting for entries");
@@ -317,9 +347,17 @@ where
                     for e in embeddings {
                         loop {
                             match tx_image_embedding.try_send(e.clone()) {
+
+
+
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    trace!("image_embedder waiting, send-queue full");
+                                    if last_log_time.elapsed().as_secs() >= 5 {
+                                        trace!("image_embedder waiting, tx_image_embedding-queue full. slept {yielded_times} ms.");
+                                        last_log_time = Instant::now();
+                                    } else {
+                                        yielded_times+=1;
+                                    }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
 
                                 }
