@@ -13,8 +13,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
-use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
 use tracing::error;
 
@@ -85,7 +84,7 @@ where
                                 } else {
                                     yielded_times+=1;
                                 }
-                                tokio::task::yield_now().await;
+                                tokio::time::sleep(Duration::from_millis(1)).await;
                             }
                             Err(err) => {
                                 error!("Producer error while sending: {:?}", err);
@@ -160,7 +159,8 @@ where
                                         yielded_times+=1;
                                     }
 
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("image_loader send error: {:?}", err);
@@ -210,7 +210,8 @@ where
                                         } else {
                                             yielded_times+=1;
                                         }
-                                        tokio::task::yield_now().await;
+                                        tokio::time::sleep(Duration::from_millis(1)).await;
+
                                     }
                                     Err(err) => {
                                         error!("image_dispatcher send error: {:?}", err);
@@ -258,7 +259,8 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     trace!("basic_extractor (hash) waiting, send-queue full");
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("basic_extractor (hash) send error: {:?}", err);
@@ -274,7 +276,8 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     trace!("basic_extractor (basic) waiting, send-queue full");
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("basic_extractor (basic) send error: {:?}", err);
@@ -317,7 +320,8 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     trace!("image_embedder waiting, send-queue full");
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("image_embedder send error: {:?}", err);
@@ -336,7 +340,6 @@ where
         let face_detection_model = self.face_detector.clone();
         let face_embedding_model = self.face_embedder.clone();
         let (tx_face_for_db, rx_face_for_db) = bounded::<Metadata<FaceInPicture>>(BUFFER);
-        let (tx_face_for_age_gender, rx_face_for_age_gender) = bounded::<Metadata<FaceInPicture>>(BUFFER);
         let (tx_face_embedding, rx_face_embedding) = bounded::<Metadata<FaceInPictureVector>>(BUFFER);
 
         let face_embedder = {
@@ -346,7 +349,6 @@ where
                 face_embedding_model.as_str(),
             );
             let tx_face_for_db = tx_face_for_db.clone();
-            let tx_face_for_age_gender = tx_face_for_age_gender.clone();
             let tx_face_embedding = tx_face_embedding.clone();
 
             tokio::spawn(async move {
@@ -365,22 +367,11 @@ where
                             match tx_face_for_db.try_send(face.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("Failed to send face_for_db: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
-                        loop {
-                            match tx_face_for_age_gender.try_send(face.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    tokio::task::yield_now().await;
-                                }
-                                Err(err) => {
-                                    error!("Failed to send face_for_age_gender: {:?}", err);
                                     break;
                                 }
                             }
@@ -394,7 +385,8 @@ where
                             match tx_face_embedding.try_send(fe.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("Failed to send face_embedding: {:?}", err);
@@ -406,7 +398,6 @@ where
                 }
 
                 drop(tx_face_for_db);
-                drop(tx_face_for_age_gender);
                 drop(tx_face_embedding);
             })
         };
@@ -422,7 +413,8 @@ where
                     for face in saved {
                         while let Err(err) = tx_face_for_age_gender_with_id.try_send(face.clone()) {
                             if err.is_full() {
-                                tokio::task::yield_now().await;
+                                tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 continue;
                             } else {
                                 error!("Failed to send: {:?}", err);
@@ -461,7 +453,8 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     trace!("age_gender_estimator waiting, send-queue full");
-                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(Duration::from_millis(1)).await;
+
                                 }
                                 Err(err) => {
                                     error!("age_gender_estimator send error: {:?}", err);
@@ -588,24 +581,6 @@ async fn collect_batch_async<T: Send + 'static>(rx: &Receiver<T>, max: usize) ->
 
     let mut items = Vec::with_capacity(max);
     items.push(first_item);
-
-    while items.len() < max {
-        match rx.try_recv() {
-            Ok(item) => items.push(item),
-            Err(_) => break,
-        }
-    }
-
-    items
-}
-
-fn collect_batch<T>(rx: &Receiver<T>, max: usize) -> Vec<T> {
-    let mut items = Vec::with_capacity(max);
-
-    match rx.recv() {
-        Ok(item) => items.push(item),
-        Err(_) => return items,
-    }
 
     while items.len() < max {
         match rx.try_recv() {
