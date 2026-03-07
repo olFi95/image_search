@@ -15,7 +15,7 @@ use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
-use tracing::error;
+use tracing::{debug, error};
 
 const BUFFER: usize = 100;
 const BATCH: usize = 25;
@@ -69,19 +69,23 @@ where
         let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
         let producer = {
             tokio::spawn(async move {
+                let mut last_log_time = Instant::now();
+                let mut waited_ms_since_last_log = 0;
+                let mut total_stalled_time = 0;
+
                 for path in all_image_paths {
                     let base = BaseImage::new(path);
-                    let mut last_log_time = Instant::now();
-                    let mut yielded_times = 0;
                     loop {
                         match tx_base_image.try_send(base.clone()) {
                             Ok(_) => break,
                             Err(err) if err.is_full() => {
                                 if last_log_time.elapsed().as_secs() >= 5 {
-                                    trace!("Producer waiting, send-queue full. slept {yielded_times} ms.");
+                                    trace!("Producer waiting, send-queue full. slept {waited_ms_since_last_log} ms.");
                                     last_log_time = Instant::now();
+                                    waited_ms_since_last_log = 0;
                                 } else {
-                                    yielded_times+=1;
+                                    waited_ms_since_last_log +=1;
+                                    total_stalled_time +=1;
                                 }
                                 tokio::time::sleep(Duration::from_millis(1)).await;
                             }
@@ -93,6 +97,7 @@ where
                     }
                 }
                 trace!("drop(tx_base_image)");
+                debug!("Producer finished sending base images. Total stalled time: {total_stalled_time} ms.");
                 drop(tx_base_image);
             })
         };
@@ -116,7 +121,6 @@ where
                     }
                 }
                 trace!("drop(tx_base_with_id)");
-
                 drop(tx_base_with_id)
             })
         };
@@ -128,6 +132,10 @@ where
 
         let image_loader = {
             tokio::spawn(async move {
+                let mut last_log_time = Instant::now();
+                let mut waited_ms_since_last_log = 0;
+                let mut total_stalled_time = 0;
+
                 loop {
                     trace!("image_loader waiting for entries");
                     let batch = collect_batch_async(&rx_base_with_id, BATCH).await;
@@ -145,18 +153,18 @@ where
                         .collect();
 
                     for img in loaded_images {
-                        let mut last_log_time = Instant::now();
-                        let mut yielded_times = 0;
 
                         loop {
                             match tx_loaded.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_loader waiting, send-queue full. slept {yielded_times} ms.");
+                                        trace!("image_loader waiting, send-queue full. slept {waited_ms_since_last_log} ms.");
                                         last_log_time = Instant::now();
+                                        waited_ms_since_last_log = 0;
                                     } else {
-                                        yielded_times+=1;
+                                        waited_ms_since_last_log +=1;
+                                        total_stalled_time +=1;
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(1)).await;
@@ -171,7 +179,7 @@ where
                     }
                 }
                 trace!("drop(tx_loaded)");
-
+                debug!("image_loader finished loading images. Total stalled time: {total_stalled_time} ms.");
                 drop(tx_loaded);
             })
         };
@@ -179,6 +187,18 @@ where
         let image_dispatcher = {
 
             tokio::spawn(async move {
+                let mut last_log_time_embedding = Instant::now();
+                let mut waited_ms_since_last_log_embedding = 0;
+                let mut total_stalled_time_embedding = 0;
+
+                let mut last_log_time_basic = Instant::now();
+                let mut waited_ms_since_last_log_basic = 0;
+                let mut total_stalled_time_basic = 0;
+
+                let mut last_log_time_face = Instant::now();
+                let mut waited_ms_since_last_log_face = 0;
+                let mut total_stalled_time_face = 0;
+
                 loop {
                     trace!("image_dispatcher waiting for entries");
                     let batch = collect_batch_async(&rx_loaded, BATCH).await;
@@ -194,18 +214,18 @@ where
                     }
 
                     for img in batch {
-                        let mut last_log_time = Instant::now();
-                        let mut yielded_times = 0;
 
                         loop {
                             match tx_for_embedding.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_embedding-queue full. slept {yielded_times} ms.");
-                                        last_log_time = Instant::now();
+                                    if last_log_time_embedding.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_embedding-queue full. slept {waited_ms_since_last_log_embedding} ms.");
+                                        last_log_time_embedding = Instant::now();
+                                        waited_ms_since_last_log_embedding = 0;
                                     } else {
-                                        yielded_times += 1;
+                                        waited_ms_since_last_log_embedding += 1;
+                                        total_stalled_time_embedding += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
                                 }
@@ -219,11 +239,13 @@ where
                             match tx_for_basic_metadata.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_basic_metadata-queue full. slept {yielded_times} ms.");
-                                        last_log_time = Instant::now();
+                                    if last_log_time_basic.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_basic_metadata-queue full. slept {waited_ms_since_last_log_basic} ms.");
+                                        last_log_time_basic = Instant::now();
+                                        waited_ms_since_last_log_basic = 0;
                                     } else {
-                                        yielded_times += 1;
+                                        waited_ms_since_last_log_basic += 1;
+                                        total_stalled_time_basic += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
                                 }
@@ -237,11 +259,13 @@ where
                             match tx_for_face.try_send(img.clone()) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
-                                    if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_face-queue full. slept {yielded_times} ms.");
-                                        last_log_time = Instant::now();
+                                    if last_log_time_face.elapsed().as_secs() >= 5 {
+                                        trace!("image_dispatcher waiting, tx_for_face-queue full. slept {waited_ms_since_last_log_face} ms.");
+                                        last_log_time_face = Instant::now();
+                                        waited_ms_since_last_log_face = 0;
                                     } else {
-                                        yielded_times += 1;
+                                        waited_ms_since_last_log_face += 1;
+                                        total_stalled_time_face += 1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
                                 }
@@ -253,9 +277,8 @@ where
                         }
                     }
                 }
-                trace!("drop(tx_for_embedding)");
-                trace!("drop(tx_for_basic_metadata)");
-                trace!("drop(tx_for_face)");
+                trace!("drop(tx_for_embedding, tx_for_basic_metadata, tx_for_face)");
+                debug!("image_dispatcher finished dispatching images. Total stalled time embedding: {total_stalled_time_embedding} ms, basic metadata: {total_stalled_time_basic} ms, face processing: {total_stalled_time_face} ms.");
 
                 drop(tx_for_embedding);
                 drop(tx_for_basic_metadata);
@@ -272,9 +295,13 @@ where
                 let basic_provider = BasicMetadataProvider;
 
                 let mut last_log_time_hash = Instant::now();
-                let mut yielded_times_hash = 0;
+                let mut waited_ms_since_last_log_hash = 0;
+                let mut total_stalled_time_hash = 0;
+
+
                 let mut last_log_time_basic = Instant::now();
-                let mut yielded_times_basic = 0;
+                let mut waited_ms_since_last_log_basic = 0;
+                let mut total_stalled_time_basic = 0;
 
                 loop {
                     trace!("basic_extractor waiting for entries");
@@ -296,10 +323,12 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_hash.elapsed().as_secs() >= 5 {
-                                        trace!("basic_extractor (hash) waiting, tx_hash-queue full. slept {yielded_times_hash} ms.");
+                                        trace!("basic_extractor (hash) waiting, tx_hash-queue full. slept {waited_ms_since_last_log_hash} ms.");
                                         last_log_time_hash = Instant::now();
+                                        waited_ms_since_last_log_hash =0;
                                     } else {
-                                        yielded_times_hash+=1;
+                                        waited_ms_since_last_log_hash +=1;
+                                        total_stalled_time_hash+=1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
 
@@ -318,10 +347,12 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_basic.elapsed().as_secs() >= 5 {
-                                        trace!("basic_extractor (basic) waiting, tx_basic-queue full. slept {yielded_times_basic} ms.");
+                                        trace!("basic_extractor (basic) waiting, tx_basic-queue full. slept {waited_ms_since_last_log_basic} ms.");
                                         last_log_time_basic = Instant::now();
+                                        waited_ms_since_last_log_basic =0;
                                     } else {
-                                        yielded_times_basic+=1;
+                                        waited_ms_since_last_log_basic +=1;
+                                        total_stalled_time_basic+=1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
 
@@ -334,9 +365,8 @@ where
                         }
                     }
                 }
-                trace!("drop(tx_hash)");
-                trace!("drop(tx_basic)");
-
+                trace!("drop(tx_hash, tx_basic)");
+                debug!("basic_extractor finished extracting basic metadata and hashes. Total stalled time hash: {total_stalled_time_hash} ms, basic metadata: {total_stalled_time_basic} ms.");
                 drop(tx_hash);
                 drop(tx_basic);
             })
@@ -349,37 +379,36 @@ where
                 let provider: ImageEmbeddingMetadataProvider<B> =
                     ImageEmbeddingMetadataProvider::new(image_embedder_device, image_embedder_model.as_str());
                 let mut last_log_time = Instant::now();
-                let mut yielded_times = 0;
+                let mut waited_ms_since_last_log = 0;
+                let mut total_stalled_time = 0;
+
 
                 loop {
                     trace!("image_embedder waiting for entries");
                     let batch = collect_batch_async(&rx_for_embedding, BATCH).await;
                     trace!(
-                "embedding {} images, {} in queue",
-                batch.len(),
-                rx_for_embedding.len()
-            );
+                        "embedding {} images, {} in queue",
+                        batch.len(),
+                        rx_for_embedding.len()
+                    );
 
                     if batch.is_empty() { break; }
-
                     let embeddings = provider.extract(&batch).expect("cannot embed images");
 
                     for e in embeddings {
                         loop {
                             match tx_image_embedding.try_send(e.clone()) {
-
-
-
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_embedder waiting, tx_image_embedding-queue full. slept {yielded_times} ms.");
+                                        trace!("image_embedder waiting, tx_image_embedding-queue full. slept {waited_ms_since_last_log} ms.");
                                         last_log_time = Instant::now();
+                                        waited_ms_since_last_log = 0;
                                     } else {
-                                        yielded_times+=1;
+                                        waited_ms_since_last_log +=1;
+                                        total_stalled_time +=1;
                                     }
                                     tokio::time::sleep(Duration::from_millis(1)).await;
-
                                 }
                                 Err(err) => {
                                     error!("image_embedder send error: {:?}", err);
@@ -390,7 +419,7 @@ where
                     }
                 }
                 trace!("drop(tx_image_embedding)");
-
+                debug!("image_embedder finished embedding images. Total stalled time: {total_stalled_time} ms.");
                 drop(tx_image_embedding);
             })
         };
@@ -416,7 +445,6 @@ where
 
                     if batch.is_empty() { break; }
 
-                    // Face detection
                     let faces = provider.extract(&batch).expect("cannot detect faces");
 
                     for face in faces.iter() {
@@ -425,7 +453,6 @@ where
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     tokio::time::sleep(Duration::from_millis(1)).await;
-
                                 }
                                 Err(err) => {
                                     error!("Failed to send face_for_db: {:?}", err);
@@ -435,7 +462,6 @@ where
                         }
                     }
 
-                    // Face embedding
                     let face_embeddings = provider.extract(&faces).expect("cannot embed faces");
                     for fe in face_embeddings {
                         loop {
@@ -453,8 +479,7 @@ where
                         }
                     }
                 }
-                trace!("drop(tx_face_for_db)");
-                trace!("drop(tx_face_embedding)");
+                trace!("drop(tx_face_for_db, tx_face_embedding)");
 
                 drop(tx_face_for_db);
                 drop(tx_face_embedding);
