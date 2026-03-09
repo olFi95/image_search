@@ -6,10 +6,15 @@ use std::path::PathBuf;
 #[derive(Parser, Debug, Clone)]
 pub struct ServerArguments {
     #[clap(
-        long = "clip-model-weights",
+        long = "clip-vision-weights",
         default_value = "./models/vision_model.bpk"
     )]
-    pub clip_model_weights: String,
+    pub clip_vision_weights: String,
+    #[clap(
+        long = "clip-text-weights",
+        default_value = "./models/text_model.bpk"
+    )]
+    pub clip_text_weights: String,
     #[clap(
         long = "arcface-model-weights",
         default_value = "./models/arcface_model.bpk"

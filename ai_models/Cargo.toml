@@ -9,6 +9,7 @@ burn-store = { workspace = true }
 image = { workspace = true }
 tokio = { workspace = true }
 rayon = { workspace = true }
+tokenizers = { workspace = true }
 
 [build-dependencies]
 onnx_updater = { path = "../onnx_updater" }

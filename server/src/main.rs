@@ -1,22 +1,23 @@
 #![recursion_limit = "256"]
 use anyhow::Context;
-use crate::clip::init_embedder;
 use crate::database::init_database;
 use crate::search::{get_faces, indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
 use axum::{Router, routing::get};
 use clap::Parser;
-use embed_anything::embeddings::embed::Embedder;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use burn::prelude::Backend;
+use burn_wgpu::{Wgpu, WgpuDevice};
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
+use ai_models::clip_embedder::ClipEmbedder;
 
 mod clip;
 mod database;
@@ -46,10 +47,10 @@ impl DbImage {
 }
 
 #[derive(Clone)]
-pub struct AppState{
+pub struct AppState<B: Backend> {
     pub arguments: ServerArguments,
     pub db: Arc<Mutex<Surreal<Any>>>,
-    pub embedder: Arc<Mutex<Embedder>>,
+    pub clip_embedder: Arc<Mutex<ClipEmbedder<B>>>,
 }
 
 fn init_logging() -> anyhow::Result<()> {
@@ -57,7 +58,6 @@ fn init_logging() -> anyhow::Result<()> {
     let package_log_level = tracing::Level::TRACE.to_string();
     let package_name = env!("CARGO_CRATE_NAME");
     let log_directive = format!("{default_level},{package_name}={package_log_level}");
-    // respect RUST_LOG environment variable
     let env_filter = match std::env::var("RUST_LOG") {
         Ok(env) => {
             EnvFilter::builder().parse(env)?
@@ -81,13 +81,12 @@ async fn tokio_main() -> anyhow::Result<()> {
 
     let surreal_db_client = init_database(&cla).await
         .context("Failed to initialize surreal db connection!")?;
-    let embedder = init_embedder().await
-        .map_err(anyhow::Error::from_boxed)
-        .context("Failed to initialize embedder!")?;
     let app_state = AppState {
         arguments: cla.clone(),
         db: Arc::new(Mutex::new(surreal_db_client)),
-        embedder: Arc::new(Mutex::new(embedder)),
+        clip_embedder: Arc::new(Mutex::new(
+            ClipEmbedder::<Wgpu>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), WgpuDevice::default())
+        )),
     };
 
     let media_dir = cla.shellexpand_media_dir()?;
