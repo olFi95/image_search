@@ -39,4 +39,8 @@ pub mod clip {
     env!("OUT_DIR"),
     "/clip_vit_large_patch14/vision_model.rs"
     ));
+    include!(concat!(
+    env!("OUT_DIR"),
+    "/clip_vit_large_patch14/text_model.rs"
+    ));
 }
