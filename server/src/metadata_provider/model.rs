@@ -126,4 +126,29 @@ impl <C: Connection>BaseImageRepository<C> {
 
         Ok(results)
     }
+
+    /// Returns the subset of `items` whose `base_image` already has a linked
+    /// `image_embedding_vector` record — i.e. images that have been fully indexed before.
+    pub async fn already_indexed(&self, items: &[BaseImage]) -> anyhow::Result<std::collections::HashSet<String>> {
+        if items.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
+
+        let paths: Vec<String> = items.iter().map(|b| b.path.clone()).collect();
+
+        let mut response = self
+            .db
+            .query(
+                r#"
+                SELECT path FROM base_image
+                WHERE path IN $paths
+                  AND ->has_image_embedding_vector->image_embedding_vector != [];
+                "#,
+            )
+            .bind(("paths", paths))
+            .await?;
+
+        let rows: Vec<BaseImage> = response.take(0).unwrap_or_default();
+        Ok(rows.into_iter().map(|b| b.path).collect())
+    }
 }

@@ -108,12 +108,23 @@ where
         let base_image_saver = {
             let repo = BaseImageRepository::new(self.db.clone()).await;
             tokio::spawn(async move {
+                let mut skipped = 0usize;
                 loop {
                     trace!("base_image_saver waiting for entries");
                     let batch = collect_batch_async(&rx_base_image, BATCH).await;
                     if batch.is_empty() { break; }
                     let inserted = repo.insert_many(batch).await.unwrap();
-                    for base in inserted {
+
+                    // Skip images that have already been fully indexed.
+                    let already_indexed = repo.already_indexed(&inserted).await.unwrap_or_default();
+                    let new_images: Vec<BaseImage> = inserted
+                        .into_iter()
+                        .filter(|b| !already_indexed.contains(&b.path))
+                        .collect();
+
+                    skipped += already_indexed.len();
+
+                    for base in new_images {
                         if tx_base_with_id.len() >= BUFFER {
                             trace!("base_image_saver waiting, ");
                         }
@@ -124,6 +135,7 @@ where
                     }
                 }
                 trace!("drop(tx_base_with_id)");
+                debug!("base_image_saver finished. Skipped {skipped} already-indexed image(s).");
                 drop(tx_base_with_id)
             })
         };
