@@ -188,7 +188,7 @@ pub fn ImageModal(image_path: String, is_open: RwSignal<bool>) -> impl IntoView 
                                 let height = (face.bottom_right_y - face.top_left_y) as f64 * 100.0;
                                 let label = match (face.age, face.gender) {
                                     (Some(age), Some(gender)) => {
-                                        let gender_str = if gender > 0.5 { "♂" } else { "♀" };
+                                        let gender_str = if gender <= 0.5 { "♂" } else { "♀" };
                                         format!("{} ~{:.0}J", gender_str, age)
                                     }
                                     _ => String::new(),
