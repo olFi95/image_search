@@ -50,3 +50,25 @@ pub struct ImageReferenceScore {
 pub struct ImagePathResult {
     pub image_path: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FacesRequest {
+    pub image_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FaceBoundingBox {
+    pub top_left_x: f32,
+    pub top_left_y: f32,
+    pub bottom_right_x: f32,
+    pub bottom_right_y: f32,
+    pub confidence: f32,
+    pub age: Option<f32>,
+    pub gender: Option<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FacesResponse {
+    pub faces: Vec<FaceBoundingBox>,
+}
+

@@ -1,3 +1,4 @@
+use surrealdb_types::SurrealValue;
 use burn::tensor::backend::Backend;
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
 use ai_models::image_embedder::ImageEmbedder;
@@ -20,7 +21,7 @@ impl<B: Backend> ImageEmbeddingMetadataProvider<B> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct ImageEmbedding {
     pub embedding: Vec<f32>,
 }
@@ -30,15 +31,23 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageE
         &self,
         images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
-        let mut results: Vec<Metadata<ImageEmbedding>> = vec![];
-        for image in images {
-            let embedding = self.image_embedder.embed(&image.image);
-            results.push(Metadata {
+        if images.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let image_refs: Vec<&image::DynamicImage> = images.iter().map(|img| &img.image).collect();
+        let embeddings = self.image_embedder.embed(&image_refs);
+
+        let results: Vec<Metadata<ImageEmbedding>> = images
+            .iter()
+            .zip(embeddings)
+            .map(|(image, embedding)| Metadata {
                 id: None,
                 metadata: Some(ImageEmbedding { embedding }),
                 base: Some(image.base_image.id.clone().unwrap()),
-            });
-        }
+            })
+            .collect();
+
         Ok(results)
     }
 }
@@ -62,13 +71,13 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
-            "#
-        ))
-        .query(format!(
-            r#"
-            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+
+            DEFINE INDEX IF NOT EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_hnsw
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
-            FIELDS embedding MTREE DIMENSION 768 DIST COSINE TYPE F32;
+            FIELDS embedding
+            HNSW
+            DIMENSION 768
+            DIST EUCLIDEAN;
             "#
         ))
         .await?;
@@ -78,7 +87,7 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
         self.db
             .query(format!(
                 r#"
-            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_mtree
+            REBUILD INDEX IF EXISTS {IMAGE_EMBEDDING_VECTOR_DATA_NAME}_hnsw
             ON {IMAGE_EMBEDDING_VECTOR_DATA_NAME};
             "#
             ))
@@ -112,7 +121,8 @@ impl <C: Connection>ImageEmbeddingMetadataRepository<C> {
                     r#"
                 LET $tmp = (
                     UPSERT {IMAGE_EMBEDDING_VECTOR_DATA_NAME}
-                    SET embedding = $embedding
+                    SET embedding = $embedding,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;

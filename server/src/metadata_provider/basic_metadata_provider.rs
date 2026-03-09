@@ -7,18 +7,17 @@ use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::time::SystemTime;
 use surrealdb::{Connection, Surreal};
-
+use surrealdb::types::{Datetime, SurrealValue};
 pub struct BasicMetadataProvider;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct BasicMetadata {
     pub file_extension: Option<String>,
     pub height: u32,
     pub width: u32,
     pub size_in_bytes: u64,
-    pub created: Option<SystemTime>,
+    pub created: Option<Datetime>,
 }
 
 impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvider {
@@ -44,7 +43,13 @@ impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvid
                                 height: base_image.image.height(),
                                 width: base_image.image.width(),
                                 size_in_bytes: metadata.len(),
-                                created: metadata.created().ok(),
+                                created: metadata
+                                    .created()
+                                    .ok()
+                                    .map(|t| {
+                                        let dt: chrono::DateTime<chrono::Utc> = t.into();
+                                        dt.into()
+                                    }),
                             }),
                             base: base_image.base_image.id.clone(),
                         })
@@ -126,7 +131,9 @@ impl <C: Connection>BasicMetadataRepository<C> {
                         height = $height,
                         width = $width,
                         size_in_bytes = $size_in_bytes,
-                        created = $created
+                        created = $created,
+                        base = $base
+                    WHERE base = $base
                 );
                 LET $id = $tmp[0].id;
                 RELATE $base -> {BASIC_METADATA_RELATION_NAME} -> $id;

@@ -1,17 +1,19 @@
 use crate::clip::clip;
 use crate::metadata_indexer::MetadataIndexer;
+use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
+use crate::metadata_provider::model::BaseImage;
 use crate::{AppState, DbImage};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
 use burn_wgpu::{Wgpu, WgpuDevice};
-use data::{ImageReference, SearchParams, SearchResponse};
+use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use surrealdb::RecordId;
+use surrealdb::types::{RecordId, SurrealValue};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct ImageType {
     pub id: Option<RecordId>,
     pub image_path: String,
@@ -53,7 +55,7 @@ pub async fn web_search_text(
                     SELECT
                         id,
                         path AS image_path,
-                        ->has_image_embedding_vector->image_embedding_vector.embedding[0] AS embedding
+                        ->has_image_embedding_vector->image_embedding_vector[0].embedding AS embedding
                     FROM base_image
                     WHERE path IN $image_paths
                 "#,
@@ -86,14 +88,15 @@ pub async fn web_search_text(
                 id,
                 vector::distance::knn() AS similarity
             FROM image_embedding_vector
-            WHERE embedding <|500|> $reference
-            ORDER BY similarity
+            WHERE embedding <|500, 150|> $reference
+            ORDER BY similarity ASC
         );
+
 
         SELECT
             similarity,
-            <-has_image_embedding_vector<-base_image[0].id[0] AS id,
-            <-has_image_embedding_vector<-base_image[0].path[0] AS image_path
+            <-has_image_embedding_vector<-base_image[0].id AS id,
+            <-has_image_embedding_vector<-base_image[0].path AS image_path
         FROM $similar_vectors;
     "#;
 
@@ -114,12 +117,88 @@ pub async fn web_search_text(
     let images: Vec<ImageReference> = db_images
         .into_iter()
         .map(|img| ImageReference {
-            id: img.id.to_string(),
+            id: img.id_string(),
             image_path: img.image_path.replace(&media_dir_str, "media/"),
         })
         .collect();
 
     Ok(Json(SearchResponse { images }))
+}
+
+pub async fn get_faces(
+    State(state): State<AppState>,
+    Json(params): Json<FacesRequest>,
+) -> Result<Json<FacesResponse>, StatusCode> {
+    debug!("Handle get_faces for image: {:?}", params.image_path);
+
+    let media_dir = state
+        .arguments
+        .shellexpand_media_dir()
+        .expect("media dir could not be loaded");
+    let media_dir_str = media_dir
+        .into_os_string()
+        .into_string()
+        .expect("media dir could not be converted to string");
+
+    let absolute_path = if params.image_path.starts_with("media/") {
+        params.image_path.replacen("media/", &media_dir_str, 1)
+    } else {
+        params.image_path.clone()
+    };
+
+    debug!("Resolved absolute_path for faces: {:?}", absolute_path);
+
+    let db = state.db.lock().await;
+
+    let mut response = db
+        .query("SELECT * FROM base_image WHERE path = $path")
+        .bind(("path", absolute_path))
+        .await
+        .map_err(|err| {
+            error!("DB query error: {:?}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let base_images: Vec<BaseImage> = response.take(0).map_err(|err| {
+        error!("Failed to deserialize base image: {:?}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let base_image = match base_images.first() {
+        Some(img) => img,
+        None => {
+            debug!("No base image found for path: {:?}", params.image_path);
+            return Ok(Json(FacesResponse { faces: vec![] }));
+        }
+    };
+
+    let query_engine = MetadataQueryEngine::new(db.clone());
+    let metadata = query_engine
+        .get_all_metadata_attached_to_base_image(base_image)
+        .await
+        .map_err(|err| {
+            error!("Failed to get metadata: {:?}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let faces: Vec<FaceBoundingBox> = metadata
+        .faces
+        .into_iter()
+        .map(|face| {
+            let age_gender = face.age_and_gender.first();
+            FaceBoundingBox {
+                top_left_x: face.top_left_x,
+                top_left_y: face.top_left_y,
+                bottom_right_x: face.bottom_right_x,
+                bottom_right_y: face.bottom_right_y,
+                confidence: face.confidence,
+                age: age_gender.map(|ag| ag.age),
+                gender: age_gender.map(|ag| ag.gender),
+            }
+        })
+        .collect();
+
+    Ok(Json(FacesResponse { faces }))
 }
 
 #[axum::debug_handler]

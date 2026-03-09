@@ -7,45 +7,52 @@ default-members = ["server"]
 anyhow = "1.0.102"
 axum = { version = "0.8.8", features = ["macros"] }
 axum-server = "0.8.0"
-burn = { version = "0.20.0-pre.6", features = ["wgpu", "vulkan", "webgpu"] }
-burn-import = { version = "0.20.0-pre.6", features = ["onnx", "safetensors", "pytorch", "default"] }
-burn-store = "0.20.0-pre.6"
-burn-wgpu = "0.20.0-pre.6"
-burn-ndarray = "0.20.0-pre.6"
+burn = { version = "0.20.1", features = ["wgpu", "vulkan", "webgpu"] }
+burn-import = { version = "0.20.1", features = ["onnx", "safetensors", "pytorch", "default"] }
+burn-store = "0.20.1"
+burn-wgpu = "0.20.1"
+burn-ndarray = "0.20.1"
+chrono = "0.4.44"
+crossbeam-channel = "0.5.15"
 console_error_panic_hook = "0.1.7"
 hf-hub = "0.5.0"
 image = "0.25.9"
 log = "0.4.29"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-surrealdb = { version = "2.3.7", features = ["kv-mem"] }
+surrealdb = { version = "3.0.1", features = ["kv-mem", "kv-rocksdb"] }
+surrealdb-types = "3.0.1"
 which = "8.0.0"
 leptos = { version = "0.8.16", features = ["csr"] }
 leptos-use = { version = "0.18.0" }
-wasm-bindgen-futures = "0.4.61"
-web-sys = { version = "0.3.88", features = ["MouseEvent", "WheelEvent", "DomRect"] }
+wasm-bindgen = "=0.2.112"
+wasm-bindgen-futures = "=0.4.62"
+web-sys = { version = "=0.3.89", features = ["MouseEvent", "WheelEvent", "DomRect"] }
 gloo-net = "0.6.0"
 serde_urlencoded = "0.7.1"
 urlencoding = "2.1.3"
-js-sys = "0.3.88"
+js-sys = "=0.3.89"
 serde-wasm-bindgen = "0.6.5"
-getrandom = { version = "0.3.4" }
-clap = { version = "4.5.45", features = ["derive"] }
-tonic = { version = "0.14.1", features = ["transport"] }
-tonic-web = "0.14.1"
-tokio = { version = "1.47.1", features = ["full"] }
-tower-http = { version = "0.6.6", features = ["fs"] }
+getrandom = { version = "0.4.1" }
+clap = { version = "4.5.60", features = ["derive"] }
+tonic = { version = "0.14.5", features = ["transport"] }
+tonic-web = "0.14.5"
+tokio = { version = "1.49.0", features = ["full"] }
+tower-http = { version = "0.6.8", features = ["fs"] }
 env_logger = "0.11.9"
 expanduser = "1.2.2"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 tracing-web = "0.1.3"
+candle-core = "=0.9.1"
+candle-nn = "=0.9.1"
+candle-transformers = "=0.9.1"
 embed_anything = "0.6.7"
 walkdir = "2.5.0"
-rand = "0.9.2"
+rand = "0.10.0"
 rayon = "1.11.0"
-bytemuck = "1.23.2"
-sha2 = "0.10.9"
+bytemuck = "1.25.0"
+sha2 = "0.11.0-rc.5"
 hex = "0.4.3"
 
 [profile.dev.package.ai_models]

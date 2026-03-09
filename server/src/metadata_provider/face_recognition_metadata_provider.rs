@@ -7,6 +7,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use burn::prelude::Backend;
 use surrealdb::{Connection, Surreal};
+use surrealdb::types::{RecordId, SurrealValue};
 
 pub struct FaceRecognitionMetadataProvider<B: Backend> {
     face_detector: FaceDetector<B>,
@@ -32,8 +33,68 @@ pub struct FaceInPicture {
     #[serde(skip)]
     pub face: Option<DynamicImage>,
 }
+impl SurrealValue for FaceInPicture {
+    fn kind_of() -> ::surrealdb::types::Kind {
+        {
+            let mut map = std::collections::BTreeMap::new();
+            map.insert("top_left_x".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("top_left_y".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("bottom_right_x".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("bottom_right_y".to_string(), <f32 as SurrealValue>::kind_of());
+            map.insert("confidence".to_string(), <f32 as SurrealValue>::kind_of());
+            ::surrealdb::types::Kind::Literal(::surrealdb::types::KindLiteral::Object(map))
+        }
+    }
+    fn is_value(value: &::surrealdb::types::Value) -> bool {
+        if let ::surrealdb::types::Value::Object(map) = value {
+            {
+                let mut valid = true;
+                if valid { if let Some(v) = map.get("top_left_x") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("top_left_y") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("bottom_right_x") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("bottom_right_y") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { if let Some(v) = map.get("confidence") { if !<f32 as SurrealValue>::is_value(v) { valid = false; } } else { valid = false; } }
+                if valid { return true; }
+            }
+        }
+        false
+    }
+    fn into_value(self) -> ::surrealdb::types::Value {
+        let Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face: _ } = self;
+        {
+            let mut map = ::surrealdb::types::Object::new();
+            map.insert("top_left_x".to_string(), top_left_x.into_value());
+            map.insert("top_left_y".to_string(), top_left_y.into_value());
+            map.insert("bottom_right_x".to_string(), bottom_right_x.into_value());
+            map.insert("bottom_right_y".to_string(), bottom_right_y.into_value());
+            map.insert("confidence".to_string(), confidence.into_value());
+            ::surrealdb::types::Value::Object(map)
+        }
+    }
+    fn from_value(value: ::surrealdb::types::Value) -> std::result::Result<Self, ::surrealdb::types::Error> {
+        if let ::surrealdb::types::Value::Object(mut map) = value {
+            {
+                let field_value = map.remove("top_left_x").unwrap_or_default();
+                let top_left_x = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "top_left_x", "FaceInPicture", e)))?;
+                let field_value = map.remove("top_left_y").unwrap_or_default();
+                let top_left_y = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "top_left_y", "FaceInPicture", e)))?;
+                let field_value = map.remove("bottom_right_x").unwrap_or_default();
+                let bottom_right_x = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "bottom_right_x", "FaceInPicture", e)))?;
+                let field_value = map.remove("bottom_right_y").unwrap_or_default();
+                let bottom_right_y = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "bottom_right_y", "FaceInPicture", e)))?;
+                let field_value = map.remove("confidence").unwrap_or_default();
+                let confidence = <f32 as SurrealValue>::from_value(field_value).map_err(|e| ::surrealdb::types::Error::internal(format!("Failed to deserialize field '{}' on type '{}': {}", "confidence", "FaceInPicture", e)))?;
+                Ok(Self { top_left_x, top_left_y, bottom_right_x, bottom_right_y, confidence, face: None })
+            }
+        } else {
+            let err = ::surrealdb::types::ConversionError::from_value(::surrealdb::types::Kind::Object, &value);
+            Err(err.into())
+        }
+    }
+}
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPictureVector {
     pub embedding: Vec<f32>,
 }
@@ -48,11 +109,17 @@ impl<B: Backend> MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRec
         &self,
         base_images: &[BaseImageWithImage],
     ) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
+        if base_images.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let image_refs: Vec<&image::DynamicImage> = base_images.iter().map(|bi| &bi.image).collect();
+        let batch_results = self.face_detector.detect_batch(&image_refs);
+
         let mut results: Vec<Metadata<FaceInPicture>> = vec![];
-        for base_image in base_images {
+        for (base_image, detected_faces) in base_images.iter().zip(batch_results.into_iter()) {
             let image_height = base_image.image.height() as f32;
             let image_width = base_image.image.width() as f32;
-            let detected_faces = self.face_detector.detect(&base_image.image);
             for face in detected_faces {
                 results.push(Metadata {
                     id: base_image.base_image.id.clone(),
@@ -78,43 +145,57 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceInPictureVector>
         &self,
         face_in_picture: &[Metadata<FaceInPicture>],
     ) -> anyhow::Result<Vec<Metadata<FaceInPictureVector>>> {
-        let mut results: Vec<Metadata<FaceInPictureVector>> = vec![];
-        for face_in_picture_metadata in face_in_picture {
-            let face_in_picture = face_in_picture_metadata.clone();
-            let face_in_picture_metadata = match face_in_picture.metadata {
-                Some(metadata) => metadata,
+        if face_in_picture.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Collect valid faces and their indices
+        let mut valid_faces: Vec<DynamicImage> = Vec::new();
+        let mut valid_ids: Vec<RecordId> = Vec::new();
+
+        for fip_metadata in face_in_picture {
+            let fip = fip_metadata.clone();
+            let metadata = match fip.metadata {
+                Some(m) => m,
                 None => {
-                    error!(
-                        "FaceInPicture metadata is missing for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("FaceInPicture metadata is missing for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face = match face_in_picture_metadata.face {
-                Some(face) => face,
+            let face = match metadata.face {
+                Some(f) => f,
                 None => {
-                    error!(
-                        "Face image is missing in FaceInPicture metadata for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("Face image is missing in FaceInPicture metadata for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face_in_picture_id = match face_in_picture.id {
+            let id = match fip.id {
+                Some(id) => id,
                 None => {
                     error!("FaceInPicture ID is missing");
                     continue;
                 }
-                Some(id) => id,
             };
-            let embedding = self.face_embedder.embed(face);
-            results.push(Metadata {
+            valid_faces.push(face);
+            valid_ids.push(id);
+        }
+
+        if valid_faces.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let embeddings = self.face_embedder.embed(&valid_faces);
+
+        let results: Vec<Metadata<FaceInPictureVector>> = valid_ids
+            .into_iter()
+            .zip(embeddings)
+            .map(|(id, embedding)| Metadata {
                 id: None,
                 metadata: Some(FaceInPictureVector { embedding }),
-                base: Some(face_in_picture_id),
-            });
-        }
+                base: Some(id),
+            })
+            .collect();
+
         Ok(results)
     }
 }
@@ -133,21 +214,35 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
     async fn prepare_repository(db: &Surreal<C>) -> anyhow::Result<()> {
         db.query(format!(
             r#"
-            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_unique
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_DATA_NAME}_base_idx
             ON {FACE_IN_PICTURE_DATA_NAME}
-            FIELDS base
-            UNIQUE;
-            "#
-        ))
-        .query(format!(
-            r#"
+            FIELDS base;
+
             DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_base_unique
             ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
             FIELDS base
             UNIQUE;
+
+            DEFINE INDEX IF NOT EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_hnsw
+            ON {FACE_IN_PICTURE_VECTOR_DATA_NAME}
+            FIELDS embedding
+            HNSW
+            DIMENSION 512
+            DIST COSINE;
             "#
         ))
         .await?;
+        Ok(())
+    }
+    pub async fn rebuild_index(&self) -> anyhow::Result<()> {
+        self.db
+            .query(format!(
+                r#"
+            REBUILD INDEX IF EXISTS {FACE_IN_PICTURE_VECTOR_DATA_NAME}_hnsw
+            ON {FACE_IN_PICTURE_VECTOR_DATA_NAME};
+            "#
+            ))
+            .await?;
         Ok(())
     }
 
@@ -179,25 +274,20 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                 .query(format!(
                     r#"
                 LET $tmp = (
-                    UPSERT {FACE_IN_PICTURE_DATA_NAME}
+                    CREATE {FACE_IN_PICTURE_DATA_NAME}
                     SET top_left_x = $top_left_x,
                         top_left_y = $top_left_y,
                         bottom_right_x = $bottom_right_x,
                         bottom_right_y = $bottom_right_y,
-                        confidence = $confidence
-                    WHERE base = $base
+                        confidence = $confidence,
+                        base = $base
                 );
-                "#
-                ))
-                .query(format!(
-                    r#"
+
                 LET $id = $tmp[0].id;
                 RELATE $base -> {FACE_IN_PICTURE_RELATION_NAME} -> $id;
-                "#
-                ))
-                .query(r#"
+
                 $tmp[0];
-                "#.to_string())
+                "#))
                 .bind(("base", item.id.clone()))
                 .bind(("top_left_x", face_in_picture_metadata.top_left_x))
                 .bind(("top_left_y", face_in_picture_metadata.top_left_y))
@@ -241,7 +331,8 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
                     r#"
                 LET $tmp = (
                     UPSERT {FACE_IN_PICTURE_VECTOR_DATA_NAME}
-                    SET embedding = $embedding
+                    SET embedding = $embedding,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;
@@ -261,3 +352,126 @@ impl <C: Connection>FaceRecognitionMetadataRepository<C> {
         Ok(inserted)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metadata_provider::model::{BaseImage, BaseImageRepository, Metadata};
+    use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
+
+    #[tokio::test]
+    async fn test_insert_and_read_single_face() {
+        use surrealdb::engine::local::Mem;
+        use surrealdb::Surreal;
+
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+
+        // Setup repositories
+        let base_image_repo = BaseImageRepository::new(db.clone()).await;
+        let face_repo = FaceRecognitionMetadataRepository::new(db.clone()).await;
+        let query_engine = MetadataQueryEngine::new(db.clone());
+
+        // Insert a base image
+        let base_images = base_image_repo
+            .insert_many(vec![BaseImage { id: None, path: "/test/1_1.jpg".to_string() }])
+            .await
+            .expect("insert base image");
+        assert_eq!(base_images.len(), 1);
+        let base_image = &base_images[0];
+        assert!(base_image.id.is_some());
+
+        // Insert one face for this base image
+        let faces = vec![Metadata {
+            id: base_image.id.clone(),
+            metadata: Some(FaceInPicture {
+                top_left_x: 0.37,
+                top_left_y: 0.12,
+                bottom_right_x: 0.56,
+                bottom_right_y: 0.31,
+                confidence: 0.65,
+                face: None,
+            }),
+            base: base_image.id.clone(),
+        }];
+
+        let inserted = face_repo
+            .insert_many_face_in_picture(&faces)
+            .await
+            .expect("insert face");
+        assert_eq!(inserted.len(), 1, "Expected 1 inserted face, got {}", inserted.len());
+
+        // Read back via query engine
+        let metadata = query_engine
+            .get_all_metadata_attached_to_base_image(base_image)
+            .await
+            .expect("query metadata");
+        assert_eq!(metadata.faces.len(), 1, "Expected 1 face from query, got {}", metadata.faces.len());
+        assert!((metadata.faces[0].confidence - 0.65).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_read_multiple_faces() {
+        use surrealdb::engine::local::Mem;
+        use surrealdb::Surreal;
+
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("test").use_db("test").await.unwrap();
+
+        let base_image_repo = BaseImageRepository::new(db.clone()).await;
+        let face_repo = FaceRecognitionMetadataRepository::new(db.clone()).await;
+        let query_engine = MetadataQueryEngine::new(db.clone());
+
+        // Insert a base image
+        let base_images = base_image_repo
+            .insert_many(vec![BaseImage { id: None, path: "/test/3_1.jpg".to_string() }])
+            .await
+            .expect("insert base image");
+        let base_image = &base_images[0];
+
+        // Insert 3 faces for this base image
+        let faces = vec![
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.1, top_left_y: 0.2,
+                    bottom_right_x: 0.3, bottom_right_y: 0.4,
+                    confidence: 0.9, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.4, top_left_y: 0.2,
+                    bottom_right_x: 0.6, bottom_right_y: 0.4,
+                    confidence: 0.85, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+            Metadata {
+                id: base_image.id.clone(),
+                metadata: Some(FaceInPicture {
+                    top_left_x: 0.7, top_left_y: 0.2,
+                    bottom_right_x: 0.9, bottom_right_y: 0.4,
+                    confidence: 0.8, face: None,
+                }),
+                base: base_image.id.clone(),
+            },
+        ];
+
+        let inserted = face_repo
+            .insert_many_face_in_picture(&faces)
+            .await
+            .expect("insert faces");
+        assert_eq!(inserted.len(), 3, "Expected 3 inserted faces, got {}", inserted.len());
+
+        // Read back via query engine
+        let metadata = query_engine
+            .get_all_metadata_attached_to_base_image(base_image)
+            .await
+            .expect("query metadata");
+        assert_eq!(metadata.faces.len(), 3, "Expected 3 faces from query, got {}", metadata.faces.len());
+    }
+}
+

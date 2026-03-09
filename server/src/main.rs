@@ -2,7 +2,7 @@
 use anyhow::Context;
 use crate::clip::init_embedder;
 use crate::database::init_database;
-use crate::search::{indexing, web_search_text};
+use crate::search::{get_faces, indexing, web_search_text};
 use crate::server_arguments::ServerArguments;
 use axum::routing::post;
 use axum::{Router, routing::get};
@@ -11,8 +11,9 @@ use embed_anything::embeddings::embed::Embedder;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
@@ -24,10 +25,24 @@ pub mod metadata_provider;
 mod search;
 mod server_arguments;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize)]
 struct DbImage {
     id: RecordId,
     image_path: String,
+}
+impl DbImage {
+    pub fn id_string(&self) -> String {
+        let key_string = match &self.id.key {
+            RecordIdKey::String(s) => s.to_string(),
+            RecordIdKey::Number(n) => n.to_string(),
+            RecordIdKey::Uuid(u) => u.to_string(),
+            RecordIdKey::Array(a) => format!("{a:?}"),
+            RecordIdKey::Object(o) => format!("{o:?}"),
+            RecordIdKey::Range(r) => format!("{r:?}"),
+        };
+
+        format!("{}:{}", self.id.table, key_string)
+    }
 }
 
 #[derive(Clone)]
@@ -78,6 +93,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
         .route("/search", post(web_search_text))
+        .route("/faces", post(get_faces))
         .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))

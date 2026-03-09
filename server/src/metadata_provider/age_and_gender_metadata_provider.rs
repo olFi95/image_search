@@ -5,8 +5,9 @@ use ai_models::face_age_and_gender_estimator::FaceAgeAndGenderEstimator;
 use log::error;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
+use surrealdb::types::SurrealValue;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceAgeAndGender {
     pub gender: f32,
     pub age: f32,
@@ -35,46 +36,61 @@ impl<B: Backend> MetadataProvider<Metadata<FaceInPicture>, FaceAgeAndGender> for
         &self,
         face_in_picture: &[Metadata<FaceInPicture>],
     ) -> anyhow::Result<Vec<Metadata<FaceAgeAndGender>>> {
-        let mut results: Vec<Metadata<FaceAgeAndGender>> = vec![];
-        for face_in_picture_metadata in face_in_picture {
-            let face_in_picture = face_in_picture_metadata.clone();
-            let face_in_picture_metadata = match face_in_picture.metadata {
-                Some(metadata) => metadata,
+        if face_in_picture.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Collect valid faces and their IDs
+        let mut valid_face_images: Vec<image::DynamicImage> = Vec::new();
+        let mut valid_ids: Vec<surrealdb::types::RecordId> = Vec::new();
+
+        for fip_metadata in face_in_picture {
+            let fip = fip_metadata.clone();
+            let metadata = match fip.metadata {
+                Some(m) => m,
                 None => {
-                    error!(
-                        "FaceInPicture metadata is missing for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("FaceInPicture metadata is missing for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face = match face_in_picture_metadata.face {
-                Some(face) => face,
+            let face = match metadata.face {
+                Some(f) => f,
                 None => {
-                    error!(
-                        "Face image is missing in FaceInPicture metadata for ID {:?}",
-                        face_in_picture.id
-                    );
+                    error!("Face image is missing in FaceInPicture metadata for ID {:?}", fip.id);
                     continue;
                 }
             };
-            let face_in_picture_id = match face_in_picture.id {
+            let id = match fip.id {
                 None => {
                     error!("FaceInPicture ID is missing");
                     continue;
                 }
                 Some(id) => id,
             };
-            let embedding = self.face_age_and_gender_estimator.embed(face);
-            results.push(Metadata {
+            valid_face_images.push(face);
+            valid_ids.push(id);
+        }
+
+        if valid_face_images.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let face_refs: Vec<&image::DynamicImage> = valid_face_images.iter().collect();
+        let batch_results = self.face_age_and_gender_estimator.estimate_age_and_gender(&face_refs);
+
+        let results: Vec<Metadata<FaceAgeAndGender>> = valid_ids
+            .into_iter()
+            .zip(batch_results)
+            .map(|(id, embedding)| Metadata {
                 id: None,
                 metadata: Some(FaceAgeAndGender {
                     age: embedding[0],
                     gender: embedding[1],
                 }),
-                base: Some(face_in_picture_id),
-            });
-        }
+                base: Some(id),
+            })
+            .collect();
+
         Ok(results)
     }
 }
@@ -130,7 +146,8 @@ impl<C: Connection> FaceAgeAndGenderMetadataRepository<C> {
                 LET $tmp = (
                     UPSERT {FACE_AGE_AND_GENDER_DATA_NAME}
                     SET age = $age,
-                        gender = $gender
+                        gender = $gender,
+                        base = $base
                     WHERE base = $base
                 );
                 LET $id = $tmp[0].id;

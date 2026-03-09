@@ -25,8 +25,11 @@ jobs:
       - name: Rust setup
         uses: ./.github/actions/rust-setup
 
-      - name: Cargo Clippy
-        run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings
+      - name: Cargo Clippy Host Code
+        run: cargo clippy -p data -p ai_models -p server -p onnx_updater --all-targets --all-features --no-deps -- -D warnings
+
+      - name: Cargo Clippy Client Code
+        run: cargo clippy -p client --target wasm32-unknown-unknown --all-features --no-deps -- -D warnings
 
   build:
     runs-on: ubuntu-latest
@@ -39,8 +42,13 @@ jobs:
 
       - name: Rust setup
         uses: ./.github/actions/rust-setup
+        with:
+          cargo-trunk: "true"
 
-      - name: Build
+      - name: Build Client
+        run: cd client && trunk build 
+
+      - name: Build Server
         run: cargo build
 
   test:

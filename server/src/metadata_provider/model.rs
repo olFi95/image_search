@@ -2,9 +2,10 @@ use image::{open, DynamicImage};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use surrealdb::{Connection, RecordId, Surreal};
+use surrealdb::{Connection, Surreal};
+use surrealdb::types::{RecordId, SurrealValue};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct BaseImage {
     pub id: Option<RecordId>,
     pub path: String,
@@ -32,6 +33,7 @@ impl TryInto<BaseImageWithImage> for BaseImage {
     }
 }
 
+#[derive(Clone)]
 pub struct BaseImageWithImage {
     pub base_image: BaseImage,
     pub image: DynamicImage,
@@ -50,14 +52,14 @@ impl BaseImage {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Metadata<M> {
+#[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
+pub struct Metadata<M: SurrealValue>  {
     pub id: Option<RecordId>,
     pub metadata: Option<M>,
     pub base: Option<RecordId>,
 }
 
-pub trait MetadataProvider<B, M> {
+pub trait MetadataProvider<B, M: SurrealValue> {
     fn extract(&self, base_data_elements: &[B]) -> anyhow::Result<Vec<Metadata<M>>>;
 }
 

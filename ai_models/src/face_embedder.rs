@@ -1,7 +1,9 @@
 use crate::arcface;
-use burn::Tensor;
 use burn::prelude::{Backend, Device};
+use burn::Tensor;
 use image::DynamicImage;
+use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
 
 pub struct FaceEmbedder<B: Backend> {
     pub model: arcface::Model<B>,
@@ -20,14 +22,40 @@ impl <B: Backend>FaceEmbedder<B> {
         }
     }
 
-    /// Generate face embedding from a cropped face image.
-    pub fn embed(&self, face_image: DynamicImage) -> Vec<f32> {
-        let preprocessed_face = Self::preprocess_arcface(&face_image);
-        let embedding = self.model.forward(preprocessed_face);
-        let embedding = embedding.reshape([512]);
-        let norm = (embedding.clone() * embedding.clone()).sum().sqrt();
-        let embedding = embedding / norm;
-        embedding.to_data().as_slice::<f32>().unwrap().to_vec()
+
+    pub fn embed(&self, face_images: &[DynamicImage]) -> Vec<Vec<f32>> {
+        if face_images.is_empty() {
+            return Vec::new();
+        }
+
+        let preprocessed: Vec<Tensor<B, 4>> = face_images
+            .par_iter()
+            .map(|img| Self::preprocess_arcface(img))
+            .collect();
+        let batch = Tensor::cat(preprocessed, 0);
+        let embeddings = self.model.forward(batch);
+        let norms = (embeddings.clone() * embeddings.clone())
+            .sum_dim(1)
+            .sqrt();
+
+        let normalized = embeddings / norms;
+
+        let binding = normalized
+            .to_data();
+        let data = binding
+            .as_slice::<f32>()
+            .unwrap();
+
+        let batch_size = face_images.len();
+        let dim = data.len()/batch_size;
+
+        (0..batch_size)
+            .map(|i| {
+                let start = i * dim;
+                let end = start + dim;
+                data[start..end].to_vec()
+            })
+            .collect()
     }
 
     pub fn preprocess_arcface(img: &DynamicImage) -> Tensor<B, 4> {
@@ -51,10 +79,12 @@ impl <B: Backend>FaceEmbedder<B> {
             &B::Device::default(),
         )
     }
+
 }
 
 #[cfg(test)]
 mod tests {
+    use std::slice::from_ref;
     use crate::face_detector::FaceDetector;
     use crate::face_embedder::FaceEmbedder;
     use burn_ndarray::{NdArray, NdArrayDevice};
@@ -68,10 +98,11 @@ mod tests {
         let face_embedder = FaceEmbedder::<NdArray>::new("../models/arcface_model.bpk", device);
 
         let image = open("../test_pictures/7_1.jpg").expect("Failed to open image");
-        let faces = face_detector.detect(&image);
+        let images_with_faces = face_detector.detect_batch(&[&image]);
+        assert_eq!(images_with_faces.len(), 1);
         let mut embeddings = Vec::new();
-        for face in faces {
-            embeddings.push(face_embedder.embed(face.face_image));
+        for faces in &images_with_faces[0] {
+            embeddings.push(face_embedder.embed(from_ref(&faces.face_image)));
         }
         assert_eq!(embeddings.len(), 7);
     }

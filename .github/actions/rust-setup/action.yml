@@ -25,12 +25,21 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang \
+          libclang-dev \
+          pkg-config \
+          build-essential
     - name: Install Rust Toolchain
       uses: dtolnay/rust-toolchain@stable
       id: toolchain
       with:
         components: clippy
-        targets: x86_64-unknown-linux-gnu
+        targets: x86_64-unknown-linux-gnu,wasm32-unknown-unknown
 
     - name: Verify Cargo Cache Location
       shell: bash
@@ -78,6 +87,17 @@ runs:
           echo "cargo-tarpaulin already installed"
         fi
       if: ${{ inputs.cargo-tarpaulin == 'true' }}
+
+    - name: Install cargo-trunk
+      shell: bash
+      run: |
+        if ! command -v cargo-trunk &> /dev/null; then
+          echo "Installing cargo-trunk..."
+          cargo install trunk --locked
+        else
+          echo "cargo-trunk already installed"
+        fi
+      if: ${{ inputs.cargo-trunk == 'true' }}
 
     - name: Install Cross
       shell: bash

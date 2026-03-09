@@ -26,3 +26,4 @@ pub fn preprocess_clip<B: Backend>(img: &DynamicImage) -> Tensor<B, 4> {
 
     image_data.into()
 }
+

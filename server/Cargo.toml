@@ -14,6 +14,8 @@ data = { path = "../data" }
 ai_models = { path = "../ai_models" , features = ["yolo","age_gender", "arcface", "clip"] }
 
 axum = { workspace = true }
+chrono = { workspace = true }
+crossbeam-channel = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }
 tokio = { workspace = true }
@@ -26,9 +28,13 @@ serde_json = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 surrealdb = { workspace = true }
+surrealdb-types = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "ansi", "tracing-log"] }
 embed_anything = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 walkdir = { workspace = true }
 urlencoding = { workspace = true }
 rand = { workspace = true }
