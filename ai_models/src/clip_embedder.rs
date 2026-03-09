@@ -72,20 +72,32 @@ impl<B: Backend> ClipEmbedder<B> {
             return Vec::new();
         }
 
-        const SEQ_LEN: usize = 77;
-        let batch_size = texts.len();
+        // CLIP uses a fixed sequence length of 77 tokens
+        const MAX_LEN: usize = 77;
 
-        // Jeden Text tokenisieren, auf SEQ_LEN truncaten/padden
-        let mut flat: Vec<i32> = Vec::with_capacity(batch_size * SEQ_LEN);
+        // <endoftext> token is used as pad token (same as EmbedAnything)
+        let vocab = self.tokenizer.get_vocab(true);
+        let pad_id = *vocab.get("<|endoftext|>").unwrap_or(&0) as i64;
+
+        let batch_size = texts.len();
+        let mut flat: Vec<i64> = Vec::with_capacity(batch_size * MAX_LEN);
+
         for text in texts {
             let encoding = self.tokenizer.encode(*text, true).expect("Failed to tokenize text");
             let ids = encoding.get_ids();
-            for i in 0..SEQ_LEN {
-                flat.push(*ids.get(i).unwrap_or(&0) as i32);
+            for i in 0..MAX_LEN {
+                flat.push(*ids.get(i).unwrap_or(&0) as i64);
+            }
+            // Pad with pad_id if shorter than MAX_LEN
+            // (already handled above via unwrap_or(&0), but use pad_id explicitly)
+            let tokens_written = ids.len().min(MAX_LEN);
+            let start = flat.len() - (MAX_LEN - tokens_written);
+            for j in start..flat.len() {
+                flat[j] = pad_id;
             }
         }
 
-        let token_data = burn::prelude::TensorData::new(flat, [batch_size, SEQ_LEN]);
+        let token_data = burn::prelude::TensorData::new(flat, [batch_size, MAX_LEN]);
         let input_ids: Tensor<B, 2, burn::prelude::Int> =
             Tensor::from_data(token_data, &self.device);
 

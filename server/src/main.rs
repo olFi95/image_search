@@ -85,7 +85,7 @@ async fn tokio_main() -> anyhow::Result<()> {
         arguments: cla.clone(),
         db: Arc::new(Mutex::new(surreal_db_client)),
         clip_embedder: Arc::new(Mutex::new(
-            ClipEmbedder::<Wgpu>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), WgpuDevice::default())
+            ClipEmbedder::<Wgpu<f32, i64>>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), WgpuDevice::default())
         )),
     };
 

@@ -4,8 +4,8 @@ use log::error;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-pub fn clip<B: Backend>(state: &AppState<B>, input: &str) -> Vec<f32> {
-    let clip_embedder = state.clip_embedder.blocking_lock();
+pub async fn clip<B: Backend>(state: &AppState<B>, input: &str) -> Vec<f32> {
+    let clip_embedder = state.clip_embedder.lock().await;
     clip_embedder.embed_text(&[input]).into_iter().next().unwrap_or_default()
 }
 
