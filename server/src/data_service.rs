@@ -4,7 +4,9 @@ use axum::http::StatusCode;
 use axum::Json;
 use burn::prelude::Backend;
 use log::{debug, error, info, trace};
-use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, SearchParams, SearchResponse};
+use serde::Serialize;
+use surrealdb_types::SurrealValue;
+use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, NumberOfImagesResponse, SearchParams, SearchResponse};
 use crate::{AppState, DbImage};
 use crate::clip::clip;
 use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
@@ -204,6 +206,31 @@ impl<B: Backend> QueryService<B> {
         Ok(Json(FacesResponse { faces }))
     }
 
+    pub async fn get_number_of_images(
+        State(state): State<AppState<B>>,
+    ) -> Result<Json<NumberOfImagesResponse>, StatusCode> {
+
+        let db = state.db.lock().await;
+
+        let mut response = db
+            .query("SELECT count() AS total FROM base_image GROUP ALL;")
+            .await
+            .map_err(|err| {
+                error!("DB query error: {:?}", err);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+        let rows: Vec<NumOfImagesResult> = response.take(0).map_err(|err| {
+            error!("Failed to deserialize response: {:?}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        let total = rows.first().map(|r| r.total).unwrap_or(0);
+
+        Ok(Json(NumberOfImagesResponse { images: total }))
+    }
+
+
     fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
         assert!(!vectors.is_empty(), "Input must not be empty");
 
@@ -228,6 +255,11 @@ impl<B: Backend> QueryService<B> {
 
         result
     }
+}
+
+#[derive(Debug, Serialize, SurrealValue)]
+struct NumOfImagesResult {
+    total: u32,
 }
 
 #[cfg(test)]

@@ -96,6 +96,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/search", post(QueryService::web_search_text))
         .route("/faces", post(QueryService::get_faces))
+        .route("/num_of_images", get(QueryService::get_number_of_images))
         .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))

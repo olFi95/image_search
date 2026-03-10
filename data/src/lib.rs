@@ -71,4 +71,8 @@ pub struct FaceBoundingBox {
 pub struct FacesResponse {
     pub faces: Vec<FaceBoundingBox>,
 }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NumberOfImagesResponse {
+    pub images: u32,
+}
 
