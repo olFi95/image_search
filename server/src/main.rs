@@ -1,23 +1,24 @@
 #![recursion_limit = "256"]
-use anyhow::Context;
+use crate::data_service::QueryService;
 use crate::database::init_database;
-use crate::search::{get_faces, indexing, web_search_text};
+use crate::search::{indexing};
 use crate::server_arguments::ServerArguments;
+use ai_models::clip_embedder::ClipEmbedder;
+use anyhow::Context;
 use axum::routing::post;
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
+use burn::prelude::Backend;
+use burn_wgpu::{Wgpu, WgpuDevice};
 use clap::Parser;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use burn::prelude::Backend;
-use burn_wgpu::{Wgpu, WgpuDevice};
-use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
+use surrealdb::Surreal;
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::EnvFilter;
-use ai_models::clip_embedder::ClipEmbedder;
 
 mod clip;
 mod database;
@@ -25,6 +26,7 @@ pub mod metadata_indexer;
 pub mod metadata_provider;
 mod search;
 mod server_arguments;
+mod data_service;
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize)]
 struct DbImage {
@@ -51,6 +53,7 @@ pub struct AppState<B: Backend> {
     pub arguments: ServerArguments,
     pub db: Arc<Mutex<Surreal<Any>>>,
     pub clip_embedder: Arc<Mutex<ClipEmbedder<B>>>,
+    pub query_service: QueryService<B>,
 }
 
 fn init_logging() -> anyhow::Result<()> {
@@ -87,12 +90,12 @@ async fn tokio_main() -> anyhow::Result<()> {
         clip_embedder: Arc::new(Mutex::new(
             ClipEmbedder::<Wgpu<f32, i64>>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), WgpuDevice::default())
         )),
+        query_service: QueryService::new(),
     };
-
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
-        .route("/search", post(web_search_text))
-        .route("/faces", post(get_faces))
+        .route("/search", post(QueryService::web_search_text))
+        .route("/faces", post(QueryService::get_faces))
         .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))
