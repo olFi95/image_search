@@ -2,3 +2,5 @@
 /target
 models
 /client/dist/
+test_pictures/open-images-dataset-test.tsv
+test_pictures/openimage
