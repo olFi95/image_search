@@ -4,6 +4,7 @@ use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProv
 use ai_models::clip_embedder::ClipEmbedder;
 use burn::prelude::Device;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 
 pub struct ImageEmbeddingMetadataProvider<B: Backend> {
@@ -27,10 +28,10 @@ pub struct ImageEmbedding {
     pub embedding: Vec<f32>,
 }
 
-impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider<B> {
+impl<B: Backend> MetadataProvider<Arc<BaseImageWithImage>, ImageEmbedding> for ImageEmbeddingMetadataProvider<B> {
     fn extract(
         &self,
-        images: &[BaseImageWithImage],
+        images: &[Arc<BaseImageWithImage>],
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
         if images.is_empty() {
             return Ok(Vec::new());

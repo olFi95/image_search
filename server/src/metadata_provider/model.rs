@@ -2,6 +2,7 @@ use image::{open, DynamicImage};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{RecordId, SurrealValue};
 
@@ -11,20 +12,15 @@ pub struct BaseImage {
     pub path: String,
 }
 
-impl TryInto<BaseImageWithImage> for BaseImage {
+impl TryInto<Arc<BaseImageWithImage>> for BaseImage {
     type Error = ();
 
-    fn try_into(self) -> Result<BaseImageWithImage, Self::Error> {
-        let image_loading_result = open(&self.path);
-        match image_loading_result {
-            Ok(loaded_image) => {
-                Ok(
-                    BaseImageWithImage {
-                        base_image: self.clone(),
-                        image: loaded_image,
-                    }
-                )
-            },
+    fn try_into(self) -> Result<Arc<BaseImageWithImage>, Self::Error> {
+        match open(&self.path) {
+            Ok(loaded_image) => Ok(Arc::new(BaseImageWithImage {
+                base_image: self,
+                image: loaded_image,
+            })),
             Err(_) => {
                 error!("Failed to load base image: {}", self.path);
                 Err(())
@@ -33,7 +29,9 @@ impl TryInto<BaseImageWithImage> for BaseImage {
     }
 }
 
-#[derive(Clone)]
+/// The loaded image is wrapped in `Arc` so that the dispatcher can hand out cheap
+/// pointer clones to the embedding, basic-metadata, and face workers without
+/// copying the pixel buffer three times.
 pub struct BaseImageWithImage {
     pub base_image: BaseImage,
     pub image: DynamicImage,

@@ -13,6 +13,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
 use tracing::{debug, error};
@@ -140,10 +141,10 @@ where
             })
         };
 
-        let (tx_loaded, rx_loaded) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_embedding, rx_for_embedding) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_basic_metadata, rx_for_basic_metadata) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_face, rx_for_face) = bounded::<BaseImageWithImage>(BUFFER);
+        let (tx_loaded, rx_loaded) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_embedding, rx_for_embedding) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_basic_metadata, rx_for_basic_metadata) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_face, rx_for_face) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
 
         let image_loader = {
             tokio::spawn(async move {
@@ -161,16 +162,17 @@ where
                         break;
                     }
 
-                    // Bilder parallel verarbeiten (CPU-bound) mit rayon
-                    let loaded_images: Vec<BaseImageWithImage> = batch
+                    // Load images in parallel (CPU-bound); each result is wrapped in Arc
+                    // so all downstream workers share the same pixel buffer.
+                    let loaded_images: Vec<Arc<BaseImageWithImage>> = batch
                         .into_par_iter()
-                        .filter_map(|base| base.clone().try_into().ok())
+                        .filter_map(|base| base.try_into().ok())
                         .collect();
 
                     for img in loaded_images {
 
                         loop {
-                            match tx_loaded.try_send(img.clone()) {
+                            match tx_loaded.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time.elapsed().as_secs() >= 5 {
@@ -231,7 +233,7 @@ where
                     for img in batch {
 
                         loop {
-                            match tx_for_embedding.try_send(img.clone()) {
+                            match tx_for_embedding.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_embedding.elapsed().as_secs() >= 5 {
@@ -251,7 +253,7 @@ where
                             }
                         }
                         loop {
-                            match tx_for_basic_metadata.try_send(img.clone()) {
+                            match tx_for_basic_metadata.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_basic.elapsed().as_secs() >= 5 {
@@ -271,7 +273,7 @@ where
                             }
                         }
                         loop {
-                            match tx_for_face.try_send(img.clone()) {
+                            match tx_for_face.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_face.elapsed().as_secs() >= 5 {

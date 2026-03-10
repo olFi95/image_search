@@ -6,6 +6,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{RecordId, SurrealValue};
 
@@ -17,10 +18,10 @@ pub struct ImageHashMetadata {
     pub hash: [u8; 32],
 }
 
-impl MetadataProvider<BaseImageWithImage, ImageHashMetadata> for ImageHashMetadataProvider {
+impl MetadataProvider<Arc<BaseImageWithImage>, ImageHashMetadata> for ImageHashMetadataProvider {
     fn extract(
         &self,
-        base_images: &[BaseImageWithImage],
+        base_images: &[Arc<BaseImageWithImage>],
     ) -> anyhow::Result<Vec<Metadata<ImageHashMetadata>>> {
         // Parallel über die Bilder iterieren
         let results: Vec<Metadata<ImageHashMetadata>> = base_images

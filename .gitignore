@@ -1,4 +1,7 @@
-.idea
+/.idea
 /target
-models
+/models
 /client/dist/
+/.venv/
+/database/
+

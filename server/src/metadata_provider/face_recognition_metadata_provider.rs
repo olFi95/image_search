@@ -6,6 +6,7 @@ use image::DynamicImage;
 use log::error;
 use serde::{Deserialize, Serialize};
 use burn::prelude::Backend;
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{RecordId, SurrealValue};
 
@@ -104,10 +105,10 @@ static FACE_IN_PICTURE_RELATION_NAME: &str = "has_face_in_picture";
 static FACE_IN_PICTURE_VECTOR_DATA_NAME: &str = "face_in_picture_vector";
 static FACE_IN_PICTURE_VECTOR_RELATION_NAME: &str = "has_face_in_picture_vector";
 
-impl<B: Backend> MetadataProvider<BaseImageWithImage, FaceInPicture> for FaceRecognitionMetadataProvider<B> {
+impl<B: Backend> MetadataProvider<Arc<BaseImageWithImage>, FaceInPicture> for FaceRecognitionMetadataProvider<B> {
     fn extract(
         &self,
-        base_images: &[BaseImageWithImage],
+        base_images: &[Arc<BaseImageWithImage>],
     ) -> anyhow::Result<Vec<Metadata<FaceInPicture>>> {
         if base_images.is_empty() {
             return Ok(Vec::new());
