@@ -166,33 +166,34 @@ mod tests {
     use crate::metadata_provider::model::{BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider};
     use image::{ColorType, DynamicImage};
     use std::path::PathBuf;
+    use std::sync::Arc;
     use surrealdb::engine::local::Mem;
     use surrealdb::Surreal;
 
     #[test]
     fn test_image_hash_metadata_provider() {
         let images = vec![
-            BaseImageWithImage {
+            Arc::new(BaseImageWithImage {
                 base_image: BaseImage {
                     id: None,
                     path: String::from("/test1.jpg"),
                 },
                 image: DynamicImage::new(10, 10, ColorType::Rgb8),
-            },
-            BaseImageWithImage {
+            }),
+            Arc::new(BaseImageWithImage {
                 base_image: BaseImage {
                     id: None,
                     path: String::from("/test2.jpg"),
                 },
                 image: DynamicImage::new(10, 10, ColorType::Rgb16),
-            },
-            BaseImageWithImage {
+            }),
+            Arc::new(BaseImageWithImage {
                 base_image: BaseImage {
                     id: None,
                     path: String::from("/test3.jpg"),
                 },
                 image: DynamicImage::new(20, 10, ColorType::Rgb8),
-            },
+            }),
         ];
         let hash_provider = super::ImageHashMetadataProvider {};
         let results = hash_provider.extract(&images).unwrap();
