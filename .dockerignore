@@ -3,3 +3,5 @@ models
 .venv
 clip/target
 .git
+test_pictures/open-images-dataset-test.tsv
+test_pictures/openimage
