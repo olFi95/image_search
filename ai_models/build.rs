@@ -15,7 +15,10 @@ fn main() -> anyhow::Result<()> {
     #[cfg(feature = "age_gender")]
     load_age_gender(&api)?;
     #[cfg(feature = "clip")]
-    load_clip(&api)?;
+    {
+        load_clip_vision(&api)?;
+        load_clip_text(&api)?;
+    }
     Ok(())
 }
 
@@ -84,7 +87,7 @@ fn load_age_gender(api: &Api) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn load_clip(api: &Api) -> anyhow::Result<()> {
+fn load_clip_vision(api: &Api) -> anyhow::Result<()> {
     let repo = api.model("Xenova/clip-vit-large-patch14".to_string());
     let downloaded_model = repo.get("onnx/vision_model.onnx")?;
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
@@ -101,6 +104,26 @@ fn load_clip(api: &Api) -> anyhow::Result<()> {
     copy_if_changed(
         &out_dir.join("clip_vit_large_patch14").join("vision_model.bpk"),
         &PathBuf::from("../models/vision_model.bpk"),
+    )?;
+    Ok(())
+}
+fn load_clip_text(api: &Api) -> anyhow::Result<()> {
+    let repo = api.model("Xenova/clip-vit-large-patch14".to_string());
+    let downloaded_model = repo.get("onnx/text_model.onnx")?;
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
+    let upgraded_model = out_dir.join("text_model.ver16.onnx");
+    println!("cargo:rerun-if-changed={}", downloaded_model.display());
+
+    onnx_updater::init()?;
+    onnx_updater::update(&downloaded_model, &upgraded_model)?;
+
+    ModelGen::new()
+        .input(upgraded_model.to_str().unwrap())
+        .out_dir("clip_vit_large_patch14")
+        .run_from_script();
+    copy_if_changed(
+        &out_dir.join("clip_vit_large_patch14").join("text_model.bpk"),
+        &PathBuf::from("../models/text_model.bpk"),
     )?;
     Ok(())
 }

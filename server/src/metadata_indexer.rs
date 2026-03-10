@@ -13,6 +13,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
 use tracing::{debug, error};
@@ -30,7 +31,8 @@ where
     face_detector: String,
     face_embedder: String,
     face_age_and_gender: String,
-    image_embedder: String,
+    clip_vision: String,
+    clip_text: String,
 }
 impl <C, B>MetadataIndexer<C, B>
 where
@@ -42,7 +44,8 @@ where
         device: Device<B>,
         face_embedder: String,
         face_detector: String,
-        image_embedder: String,
+        clip_vision: String,
+        clip_text: String,
         face_age_and_gender: String,
     ) -> Self {
         MetadataIndexer {
@@ -50,7 +53,8 @@ where
             device,
             face_embedder,
             face_detector,
-            image_embedder,
+            clip_vision,
+            clip_text,
             face_age_and_gender,
         }
     }
@@ -105,12 +109,23 @@ where
         let base_image_saver = {
             let repo = BaseImageRepository::new(self.db.clone()).await;
             tokio::spawn(async move {
+                let mut skipped = 0usize;
                 loop {
                     trace!("base_image_saver waiting for entries");
                     let batch = collect_batch_async(&rx_base_image, BATCH).await;
                     if batch.is_empty() { break; }
                     let inserted = repo.insert_many(batch).await.unwrap();
-                    for base in inserted {
+
+                    // Skip images that have already been fully indexed.
+                    let already_indexed = repo.already_indexed(&inserted).await.unwrap_or_default();
+                    let new_images: Vec<BaseImage> = inserted
+                        .into_iter()
+                        .filter(|b| !already_indexed.contains(&b.path))
+                        .collect();
+
+                    skipped += already_indexed.len();
+
+                    for base in new_images {
                         if tx_base_with_id.len() >= BUFFER {
                             trace!("base_image_saver waiting, ");
                         }
@@ -121,14 +136,15 @@ where
                     }
                 }
                 trace!("drop(tx_base_with_id)");
+                debug!("base_image_saver finished. Skipped {skipped} already-indexed image(s).");
                 drop(tx_base_with_id)
             })
         };
 
-        let (tx_loaded, rx_loaded) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_embedding, rx_for_embedding) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_basic_metadata, rx_for_basic_metadata) = bounded::<BaseImageWithImage>(BUFFER);
-        let (tx_for_face, rx_for_face) = bounded::<BaseImageWithImage>(BUFFER);
+        let (tx_loaded, rx_loaded) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_embedding, rx_for_embedding) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_basic_metadata, rx_for_basic_metadata) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_for_face, rx_for_face) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
 
         let image_loader = {
             tokio::spawn(async move {
@@ -146,16 +162,17 @@ where
                         break;
                     }
 
-                    // Bilder parallel verarbeiten (CPU-bound) mit rayon
-                    let loaded_images: Vec<BaseImageWithImage> = batch
+                    // Load images in parallel (CPU-bound); each result is wrapped in Arc
+                    // so all downstream workers share the same pixel buffer.
+                    let loaded_images: Vec<Arc<BaseImageWithImage>> = batch
                         .into_par_iter()
-                        .filter_map(|base| base.clone().try_into().ok())
+                        .filter_map(|base| base.try_into().ok())
                         .collect();
 
                     for img in loaded_images {
 
                         loop {
-                            match tx_loaded.try_send(img.clone()) {
+                            match tx_loaded.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time.elapsed().as_secs() >= 5 {
@@ -216,7 +233,7 @@ where
                     for img in batch {
 
                         loop {
-                            match tx_for_embedding.try_send(img.clone()) {
+                            match tx_for_embedding.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_embedding.elapsed().as_secs() >= 5 {
@@ -236,7 +253,7 @@ where
                             }
                         }
                         loop {
-                            match tx_for_basic_metadata.try_send(img.clone()) {
+                            match tx_for_basic_metadata.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_basic.elapsed().as_secs() >= 5 {
@@ -256,7 +273,7 @@ where
                             }
                         }
                         loop {
-                            match tx_for_face.try_send(img.clone()) {
+                            match tx_for_face.try_send(Arc::clone(&img)) {
                                 Ok(_) => break,
                                 Err(err) if err.is_full() => {
                                     if last_log_time_face.elapsed().as_secs() >= 5 {
@@ -372,12 +389,13 @@ where
             })
         };
         let image_embedder_device = self.device.clone();
-        let image_embedder_model = self.image_embedder.clone();
+        let clip_vision_model = self.clip_vision.clone();
+        let clip_text_model = self.clip_text.clone();
         let (tx_image_embedding, rx_image_embedding) = bounded::<Metadata<ImageEmbedding>>(BUFFER);
         let image_embedder = {
             tokio::spawn(async move {
                 let provider: ImageEmbeddingMetadataProvider<B> =
-                    ImageEmbeddingMetadataProvider::new(image_embedder_device, image_embedder_model.as_str());
+                    ImageEmbeddingMetadataProvider::new(image_embedder_device, clip_vision_model.as_str(), clip_text_model.as_str());
                 let mut last_log_time = Instant::now();
                 let mut waited_ms_since_last_log = 0;
                 let mut total_stalled_time = 0;
@@ -712,6 +730,7 @@ mod test {
                         "../models/arcface_model.bpk".to_string(),
                         "../models/yolo.bpk".to_string(),
                         "../models/vision_model.bpk".to_string(),
+                        "../models/text_model.bpk".to_string(),
                         "../models/age_gender.bpk".to_string(),
                     );
 

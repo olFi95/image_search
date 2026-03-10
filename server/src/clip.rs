@@ -1,21 +1,12 @@
 use crate::AppState;
-use embed_anything::embeddings::embed::Embedder;
-use log::{error, info};
+use burn::prelude::Backend;
+use log::error;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-pub async fn clip(state: &AppState, input: String) -> Vec<f32>{
-
-    let clip_embedder = state.embedder.lock().await;
-    let embedding_result = &clip_embedder.embed(&[&input], None, None).await.unwrap()[0];
-    embedding_result.to_dense().unwrap()
-}
-
-pub async fn init_embedder() -> Result<Embedder, Box<dyn std::error::Error + Send + Sync>> {
-    let clip_embedder =
-        Embedder::from_pretrained_hf("openai/clip-vit-large-patch14", Some("e45c02554b24d4c70b955be461d78a18e91d579c"), None, None)?;
-    info!("Embedder initialized");
-    Ok(clip_embedder)
+pub async fn clip<B: Backend>(state: &AppState<B>, input: &str) -> Vec<f32> {
+    let clip_embedder = state.clip_embedder.lock().await;
+    clip_embedder.embed_text(&[input]).into_iter().next().unwrap_or_default()
 }
 
 pub fn get_all_directories_in_dir(media_dir: &PathBuf) -> Vec<String> {

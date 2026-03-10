@@ -1,22 +1,24 @@
 use surrealdb_types::SurrealValue;
 use burn::tensor::backend::Backend;
 use crate::metadata_provider::model::{BaseImageWithImage, Metadata, MetadataProvider};
-use ai_models::image_embedder::ImageEmbedder;
+use ai_models::clip_embedder::ClipEmbedder;
 use burn::prelude::Device;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 
 pub struct ImageEmbeddingMetadataProvider<B: Backend> {
-    image_embedder: ImageEmbedder<B>,
+    clip_embedder: ClipEmbedder<B>,
 }
 
 impl<B: Backend> ImageEmbeddingMetadataProvider<B> {
     pub fn new(
         device: Device<B>,
-        image_embedder: &str,
+        vision_model: &str,
+        text_model: &str,
     ) -> Self {
         Self {
-            image_embedder: ImageEmbedder::new(image_embedder, device),
+            clip_embedder: ClipEmbedder::new(vision_model, text_model, device),
         }
     }
 }
@@ -26,17 +28,17 @@ pub struct ImageEmbedding {
     pub embedding: Vec<f32>,
 }
 
-impl<B: Backend> MetadataProvider<BaseImageWithImage, ImageEmbedding> for ImageEmbeddingMetadataProvider<B> {
+impl<B: Backend> MetadataProvider<Arc<BaseImageWithImage>, ImageEmbedding> for ImageEmbeddingMetadataProvider<B> {
     fn extract(
         &self,
-        images: &[BaseImageWithImage],
+        images: &[Arc<BaseImageWithImage>],
     ) -> anyhow::Result<Vec<Metadata<ImageEmbedding>>> {
         if images.is_empty() {
             return Ok(Vec::new());
         }
 
         let image_refs: Vec<&image::DynamicImage> = images.iter().map(|img| &img.image).collect();
-        let embeddings = self.image_embedder.embed(&image_refs);
+        let embeddings = self.clip_embedder.embed_images(&image_refs);
 
         let results: Vec<Metadata<ImageEmbedding>> = images
             .iter()

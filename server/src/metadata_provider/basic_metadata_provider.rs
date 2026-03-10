@@ -7,6 +7,7 @@ use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{Datetime, SurrealValue};
 pub struct BasicMetadataProvider;
@@ -20,10 +21,10 @@ pub struct BasicMetadata {
     pub created: Option<Datetime>,
 }
 
-impl MetadataProvider<BaseImageWithImage, BasicMetadata> for BasicMetadataProvider {
+impl MetadataProvider<Arc<BaseImageWithImage>, BasicMetadata> for BasicMetadataProvider {
     fn extract(
         &self,
-        base_images: &[BaseImageWithImage],
+        base_images: &[Arc<BaseImageWithImage>],
     ) -> anyhow::Result<Vec<Metadata<BasicMetadata>>> {
         let results: Vec<Metadata<BasicMetadata>> = base_images
             .par_iter()

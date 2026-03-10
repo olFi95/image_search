@@ -7,6 +7,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
+use burn::prelude::Backend;
 use burn_wgpu::{Wgpu, WgpuDevice};
 use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, SearchParams, SearchResponse};
 use log::{debug, error, info, trace};
@@ -20,14 +21,14 @@ pub struct ImageType {
     pub embedding: Vec<f32>,
 }
 
-pub async fn web_search_text(
-    State(state): State<AppState>,
+pub async fn web_search_text<B: Backend>(
+    State(state): State<AppState<B>>,
     Json(params): Json<SearchParams>,
 ) -> Result<Json<SearchResponse>, StatusCode>{
     debug!("Handle Search with params: {:?}", params);
 
-    let db = state.db.lock().await; // oder wie du deine DB-Instanz nutzt
-    let embedding = clip(&state, params.q).await;
+    let db = state.db.lock().await;
+    let embedding = clip(&state, params.q.as_str()).await;
     let mut query_vector = embedding.clone();
 
     info!("image_paths: {:?}", params.referenced_images);
@@ -125,8 +126,8 @@ pub async fn web_search_text(
     Ok(Json(SearchResponse { images }))
 }
 
-pub async fn get_faces(
-    State(state): State<AppState>,
+pub async fn get_faces<B: Backend>(
+    State(state): State<AppState<B>>,
     Json(params): Json<FacesRequest>,
 ) -> Result<Json<FacesResponse>, StatusCode> {
     debug!("Handle get_faces for image: {:?}", params.image_path);
@@ -201,23 +202,22 @@ pub async fn get_faces(
     Ok(Json(FacesResponse { faces }))
 }
 
-#[axum::debug_handler]
-pub async fn indexing(State(state): State<AppState>) -> impl IntoResponse{
+pub async fn indexing<B: Backend>(State(state): State<AppState<B>>) -> impl IntoResponse{
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {
-        // ❗ alles Nicht-Send hier rein
         let rt = tokio::runtime::Handle::current();
 
         rt.block_on(async {
             let device = WgpuDevice::DefaultDevice;
 
-            let metadata_indexer: MetadataIndexer<_, Wgpu> = MetadataIndexer::new(
+            let metadata_indexer: MetadataIndexer<_, Wgpu<f32, i64>> = MetadataIndexer::new(
                 state.db.lock().await.clone(),
                 device,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),
-                state.arguments.clip_model_weights.clone(),
+                state.arguments.clip_vision_weights.clone(),
+                state.arguments.clip_text_weights.clone(),
                 state.arguments.age_and_gender_model_weights.clone(),
             );
 

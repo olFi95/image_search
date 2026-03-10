@@ -5,7 +5,7 @@ pub mod face_detector;
 #[cfg(feature = "arcface")]
 pub mod face_embedder;
 #[cfg(feature = "clip")]
-pub mod image_embedder;
+pub mod clip_embedder;
 pub mod utils;
 
 extern crate alloc;
@@ -32,11 +32,21 @@ pub mod age_gender {
 }
 
 #[cfg(feature = "clip")]
-#[allow(warnings)]
-#[allow(clippy::all)]
 pub mod clip {
-    include!(concat!(
-    env!("OUT_DIR"),
-    "/clip_vit_large_patch14/vision_model.rs"
-    ));
+    #[allow(warnings)]
+    #[allow(clippy::all)]
+    pub mod vision {
+        include!(concat!(
+            env!("OUT_DIR"),
+            "/clip_vit_large_patch14/vision_model.rs"
+        ));
+    }
+    #[allow(warnings)]
+    #[allow(clippy::all)]
+    pub mod text {
+        include!(concat!(
+            env!("OUT_DIR"),
+            "/clip_vit_large_patch14/text_model.rs"
+        ));
+    }
 }
