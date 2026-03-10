@@ -1,7 +1,7 @@
 /.idea
-/target
-/models
-/client/dist/
 /.venv/
-/database/
-
+/client/dist/
+/models
+/target
+test_pictures/open-images-dataset-test.tsv
+test_pictures/openimage
