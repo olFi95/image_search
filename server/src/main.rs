@@ -1,5 +1,5 @@
 #![recursion_limit = "256"]
-use crate::data_service::QueryService;
+use crate::query_service::QueryService;
 use crate::database::init_database;
 use crate::search::{indexing};
 use crate::server_arguments::ServerArguments;
@@ -26,7 +26,7 @@ pub mod metadata_indexer;
 pub mod metadata_provider;
 mod search;
 mod server_arguments;
-mod data_service;
+mod query_service;
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize)]
 struct DbImage {
