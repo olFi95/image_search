@@ -66,12 +66,12 @@ impl<B: Backend> QueryService<B> {
                     .context("Failed to deserialize response")?;
             debug!("marked_image_embeddings {}", marked_image.len());
             if !marked_image.is_empty() {
-                let slices = marked_image
+                let mut slices = marked_image
                     .iter()
                     .map(|embedding| &embedding.embedding)
                     .collect::<Vec<&Vec<f32>>>();
-                let selected_images_average = Self::average_slices(&slices);
-                query_vector = Self::average_slices(&vec![&selected_images_average, &query_vector]);
+                slices.push(&query_vector);
+                query_vector = Self::average_slices(&slices);
             }
         }
 
