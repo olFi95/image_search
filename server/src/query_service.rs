@@ -1,17 +1,16 @@
 use std::marker::PhantomData;
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::Json;
 use burn::prelude::Backend;
-use log::{debug, error, info, trace};
+use log::{debug, info, trace};
 use serde::Serialize;
+use surrealdb::Surreal;
+use surrealdb::engine::any::Any;
 use surrealdb_types::SurrealValue;
 use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, NumberOfImagesResponse, SearchParams, SearchResponse};
-use crate::{AppState, DbImage};
-use crate::clip::clip;
+use crate::DbImage;
 use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
 use crate::metadata_provider::model::BaseImage;
 use crate::search::ImageType;
+use anyhow::{Context, Result};
 
 #[derive(Clone)]
 pub struct QueryService<B: Backend>{
@@ -25,32 +24,26 @@ impl<B: Backend> QueryService<B> {
             _marker: PhantomData,
         }
     }
-    pub async fn web_search_text(
-        State(state): State<AppState<B>>,
-        Json(params): Json<SearchParams>,
-    ) -> Result<Json<SearchResponse>, StatusCode>{
+
+    pub async fn search_text(
+        &self,
+        db: &Surreal<Any>,
+        text_embedding: Vec<f32>,
+        params: SearchParams,
+        media_dir_str: &str,
+    ) -> Result<SearchResponse> {
         debug!("Handle Search with params: {:?}", params);
 
-        let db = state.db.lock().await;
-        let embedding = clip(&state, params.q.as_str()).await;
-        let mut query_vector = embedding.clone();
+        let mut query_vector = text_embedding;
 
         info!("image_paths: {:?}", params.referenced_images);
-        let media_dir = state
-            .arguments
-            .shellexpand_media_dir()
-            .expect("media dir could not be loaded");
-        let media_dir_str = media_dir
-            .into_os_string()
-            .into_string()
-            .expect("media dir could not be converted to string");
 
         if !params.referenced_images.is_empty() {
             let image_paths: Vec<String> = params
                 .referenced_images
                 .into_iter()
                 .filter(|img| img.starts_with("media/"))
-                .map(|img| img.replacen("media/", &media_dir_str, 1))
+                .map(|img| img.replacen("media/", media_dir_str, 1))
                 .collect::<Vec<String>>();
             trace!("image_paths: {image_paths:?}");
 
@@ -67,15 +60,10 @@ impl<B: Backend> QueryService<B> {
                 )
                 .bind(("image_paths", image_paths))
                 .await
-                .map_err(|err| {
-                    error!("DB query error: {:?}", err);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
+                .context("DB query error")?;
             let marked_image: Vec<ImageType> =
-                marked_image_embeddings_response.take(0).map_err(|err| {
-                    error!("Failed to deserialize response: {:?}", err);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
+                marked_image_embeddings_response.take(0)
+                    .context("Failed to deserialize response")?;
             debug!("marked_image_embeddings {}", marked_image.len());
             if !marked_image.is_empty() {
                 let slices = marked_image
@@ -83,7 +71,7 @@ impl<B: Backend> QueryService<B> {
                     .map(|embedding| &embedding.embedding)
                     .collect::<Vec<&Vec<f32>>>();
                 let selected_images_average = Self::average_slices(&slices);
-                query_vector = Self::average_slices(&vec![&selected_images_average, &embedding]);
+                query_vector = Self::average_slices(&vec![&selected_images_average, &query_vector]);
             }
         }
 
@@ -109,71 +97,53 @@ impl<B: Backend> QueryService<B> {
             .query(query)
             .bind(("reference", query_vector))
             .await
-            .map_err(|err| {
-                tracing::error!("DB query error: {:?}", err);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            .context("DB query error")?;
 
-        let db_images: Vec<DbImage> = response.take(1).map_err(|err| {
-            tracing::error!("Failed to deserialize response: {:?}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        let db_images: Vec<DbImage> = response.take(1)
+            .context("Failed to deserialize response")?;
 
         let images: Vec<ImageReference> = db_images
             .into_iter()
             .map(|img| ImageReference {
                 id: img.id_string(),
-                image_path: img.image_path.replace(&media_dir_str, "media/"),
+                image_path: img.image_path.replace(media_dir_str, "media/"),
             })
             .collect();
 
-        Ok(Json(SearchResponse { images }))
+        Ok(SearchResponse { images })
     }
 
     pub async fn get_faces(
-        State(state): State<AppState<B>>,
-        Json(params): Json<FacesRequest>,
-    ) -> Result<Json<FacesResponse>, StatusCode> {
+        &self,
+        db: &Surreal<Any>,
+        params: FacesRequest,
+        media_dir_str: &str,
+    ) -> Result<FacesResponse> {
         debug!("Handle get_faces for image: {:?}", params.image_path);
 
-        let media_dir = state
-            .arguments
-            .shellexpand_media_dir()
-            .expect("media dir could not be loaded");
-        let media_dir_str = media_dir
-            .into_os_string()
-            .into_string()
-            .expect("media dir could not be converted to string");
-
         let absolute_path = if params.image_path.starts_with("media/") {
-            params.image_path.replacen("media/", &media_dir_str, 1)
+            params.image_path.replacen("media/", media_dir_str, 1)
         } else {
             params.image_path.clone()
         };
 
         debug!("Resolved absolute_path for faces: {:?}", absolute_path);
 
-        let db = state.db.lock().await;
 
         let mut response = db
             .query("SELECT * FROM base_image WHERE path = $path")
             .bind(("path", absolute_path))
             .await
-            .map_err(|err| {
-                error!("DB query error: {:?}", err);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            .context("DB query error")?;
 
-        let base_images: Vec<BaseImage> = response.take(0).map_err(|err| {
-            error!("Failed to deserialize base image: {:?}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        let base_images: Vec<BaseImage> = response.take(0)
+            .context("Failed to deserialize base image")?;
 
         let base_image = match base_images.first() {
             Some(img) => img,
             None => {
                 debug!("No base image found for path: {:?}", params.image_path);
-                return Ok(Json(FacesResponse { faces: vec![] }));
+                return Ok(FacesResponse { faces: vec![] });
             }
         };
 
@@ -181,10 +151,7 @@ impl<B: Backend> QueryService<B> {
         let metadata = query_engine
             .get_all_metadata_attached_to_base_image(base_image)
             .await
-            .map_err(|err| {
-                error!("Failed to get metadata: {:?}", err);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            .context("Failed to get metadata")?;
 
         let faces: Vec<FaceBoundingBox> = metadata
             .faces
@@ -203,33 +170,26 @@ impl<B: Backend> QueryService<B> {
             })
             .collect();
 
-        Ok(Json(FacesResponse { faces }))
+        Ok(FacesResponse { faces })
     }
 
     pub async fn get_number_of_images(
-        State(state): State<AppState<B>>,
-    ) -> Result<Json<NumberOfImagesResponse>, StatusCode> {
-
-        let db = state.db.lock().await;
+        &self,
+        db: &Surreal<Any>,
+    ) -> Result<NumberOfImagesResponse> {
 
         let mut response = db
             .query("SELECT count() AS total FROM base_image GROUP ALL;")
             .await
-            .map_err(|err| {
-                error!("DB query error: {:?}", err);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            .context("DB query error")?;
 
-        let rows: Vec<NumOfImagesResult> = response.take(0).map_err(|err| {
-            error!("Failed to deserialize response: {:?}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        let rows: Vec<NumOfImagesResult> = response.take(0)
+            .context("Failed to deserialize response")?;
 
         let total = rows.first().map(|r| r.total).unwrap_or(0);
 
-        Ok(Json(NumberOfImagesResponse { images: total }))
+        Ok(NumberOfImagesResponse { images: total })
     }
-
 
     fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
         assert!(!vectors.is_empty(), "Input must not be empty");

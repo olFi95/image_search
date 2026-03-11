@@ -1,16 +1,10 @@
-use crate::clip::clip;
 use crate::metadata_indexer::MetadataIndexer;
-use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
-use crate::metadata_provider::model::BaseImage;
-use crate::{AppState, DbImage};
+use crate::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
 use axum::response::IntoResponse;
 use burn::prelude::Backend;
 use burn_wgpu::{Wgpu, WgpuDevice};
-use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, SearchParams, SearchResponse};
-use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use surrealdb::types::{RecordId, SurrealValue};
 
@@ -33,7 +27,7 @@ pub async fn indexing<B: Backend>(State(state): State<AppState<B>>) -> impl Into
             let device = WgpuDevice::DefaultDevice;
 
             let metadata_indexer: MetadataIndexer<_, Wgpu<f32, i64>> = MetadataIndexer::new(
-                state.db.lock().await.clone(),
+                state.db.clone(),
                 device,
                 state.arguments.arcface_model_weights.clone(),
                 state.arguments.yolo_model_weights.clone(),

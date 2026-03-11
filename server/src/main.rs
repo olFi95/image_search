@@ -8,11 +8,11 @@ use anyhow::Context;
 use axum::routing::post;
 use axum::{routing::get, Router};
 use burn::prelude::Backend;
-use burn_wgpu::{Wgpu, WgpuDevice};
 use clap::Parser;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use burn_ndarray::{NdArray, NdArrayDevice};
 use surrealdb::engine::any::Any;
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 use surrealdb::Surreal;
@@ -22,6 +22,7 @@ use tracing_subscriber::EnvFilter;
 
 mod clip;
 mod database;
+mod handlers;
 pub mod metadata_indexer;
 pub mod metadata_provider;
 mod search;
@@ -51,7 +52,7 @@ impl DbImage {
 #[derive(Clone)]
 pub struct AppState<B: Backend> {
     pub arguments: ServerArguments,
-    pub db: Arc<Mutex<Surreal<Any>>>,
+    pub db: Surreal<Any>,
     pub clip_embedder: Arc<Mutex<ClipEmbedder<B>>>,
     pub query_service: QueryService<B>,
 }
@@ -86,17 +87,15 @@ async fn tokio_main() -> anyhow::Result<()> {
         .context("Failed to initialize surreal db connection!")?;
     let app_state = AppState {
         arguments: cla.clone(),
-        db: Arc::new(Mutex::new(surreal_db_client)),
-        clip_embedder: Arc::new(Mutex::new(
-            ClipEmbedder::<Wgpu<f32, i64>>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), WgpuDevice::default())
-        )),
+        db: surreal_db_client,
+        clip_embedder: Arc::new(Mutex::new(ClipEmbedder::<NdArray>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), NdArrayDevice::Cpu))),
         query_service: QueryService::new(),
     };
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()
-        .route("/search", post(QueryService::web_search_text))
-        .route("/faces", post(QueryService::get_faces))
-        .route("/num_of_images", get(QueryService::get_number_of_images))
+        .route("/search", post(handlers::web_search_text))
+        .route("/faces", post(handlers::web_get_faces))
+        .route("/num_of_images", get(handlers::web_get_number_of_images))
         .route("/scan", get(indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))

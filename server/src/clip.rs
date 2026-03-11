@@ -1,13 +1,7 @@
-use crate::AppState;
-use burn::prelude::Backend;
 use log::error;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-pub async fn clip<B: Backend>(state: &AppState<B>, input: &str) -> Vec<f32> {
-    let clip_embedder = state.clip_embedder.lock().await;
-    clip_embedder.embed_text(&[input]).into_iter().next().unwrap_or_default()
-}
 
 pub fn get_all_directories_in_dir(media_dir: &PathBuf) -> Vec<String> {
     let all_image_paths: Vec<String> = WalkDir::new(media_dir)
