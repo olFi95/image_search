@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 use burn::prelude::Backend;
 use log::{debug, info, trace};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb_types::SurrealValue;
-use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, DatabaseStatusResponse, SearchParams, SearchResponse};
+use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, DatabaseStatusResponse, SearchParams, SearchResponse, SimilarFacesSearchParams, FaceSearchResponse, FaceImageReference};
 use crate::DbImage;
 use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
 use crate::metadata_provider::model::BaseImage;
@@ -173,6 +173,45 @@ impl<B: Backend> QueryService<B> {
         Ok(FacesResponse { faces })
     }
 
+    pub async fn get_similar_faces(
+        &self,
+        db: &Surreal<Any>,
+        params: SimilarFacesSearchParams,
+        media_dir_str: &str,
+    ) -> Result<FaceSearchResponse>{
+
+        let mut response = db.query(r#"
+            LET $vec = (
+                SELECT VALUE embedding
+                FROM face_in_picture_vector
+                WHERE id = $face_id
+            )[0];
+
+            SELECT
+                id,
+                base.path as image_path,
+                vector::similarity::cosine(embedding, $vec) AS similarity
+            FROM face_in_picture_vector
+            WHERE embedding <|50,150|> $vec
+            ORDER BY similarity DESC
+            LIMIT $number_of_results;
+        "#)
+            .bind(("face_id", params.face_id))
+            .bind(("number_of_results", params.n))
+            .await
+            .context("DB query error")?;
+        let face_image_reference_dbb_results: Vec<FaceImageReferenceDbResult> = response.take(1)
+            .context("Failed to deserialize base image")?;
+        let results = face_image_reference_dbb_results.into_iter()
+            .map(|res| FaceImageReference {
+                id: res.id,
+                image_path: res.image_path.replace(media_dir_str, "media/"),
+                similarity: res.similarity,
+            })
+            .collect();
+        Ok(FaceSearchResponse { images: results })
+    }
+
     pub async fn get_database_status(
         &self,
         db: &Surreal<Any>,
@@ -223,6 +262,12 @@ impl<B: Backend> QueryService<B> {
 
         result
     }
+}
+#[derive(Debug, SurrealValue, Serialize, Deserialize, Clone)]
+pub struct FaceImageReferenceDbResult {
+    pub id: String,
+    pub image_path: String,
+    pub similarity: f32
 }
 
 #[derive(Debug, Serialize, SurrealValue)]

@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use burn::prelude::Backend;
 use log::error;
-use data::{FacesRequest, FacesResponse, DatabaseStatusResponse, SearchParams, SearchResponse};
+use data::{FacesRequest, FacesResponse, DatabaseStatusResponse, SearchParams, SearchResponse, SimilarFacesSearchParams, FaceSearchResponse};
 use crate::AppState;
 
 pub async fn web_search_text<B: Backend>(
@@ -65,6 +65,35 @@ pub async fn web_get_faces<B: Backend>(
 
     let result = state.query_service
         .get_faces(&state.db, params, &media_dir_str)
+        .await
+        .map_err(|err| {
+            error!("Get faces failed: {:?}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(result))
+}
+pub async fn web_get_similar_faces<B: Backend>(
+    State(state): State<AppState<B>>,
+    Json(params): Json<SimilarFacesSearchParams>,
+) -> Result<Json<FaceSearchResponse>, StatusCode> {
+    let media_dir = state
+        .arguments
+        .shellexpand_media_dir()
+        .map_err(|err| {
+            error!("Failed to get media dir: {:?}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let media_dir_str = media_dir
+        .into_os_string()
+        .into_string()
+        .map_err(|_| {
+            error!("Failed to convert media dir to string");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let result = state.query_service
+        .get_similar_faces(&state.db, params, &media_dir_str)
         .await
         .map_err(|err| {
             error!("Get faces failed: {:?}", err);

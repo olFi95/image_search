@@ -95,6 +95,7 @@ async fn tokio_main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/search", post(handlers::web_search_text))
         .route("/faces", post(handlers::web_get_faces))
+        .route("/similar_faces", post(handlers::web_get_similar_faces))
         .route("/database_status", get(handlers::web_get_database_status))
         .route("/scan", get(indexing))
         .with_state(app_state)

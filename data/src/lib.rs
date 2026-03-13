@@ -8,13 +8,28 @@ pub struct SearchParams {
     pub referenced_images: Vec<String>,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SimilarFacesSearchParams {
+    pub face_id: String,
+    pub n: u32,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchResponse {
     pub images: Vec<ImageReference>,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FaceSearchResponse {
+    pub images: Vec<FaceImageReference>,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageReference {
     pub id: String,
     pub image_path: String,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FaceImageReference {
+    pub id: String,
+    pub image_path: String,
+    pub similarity: f32
 }
 impl ImageReference {
     pub fn new(image_path: String) -> Self {
