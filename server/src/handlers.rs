@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use burn::prelude::Backend;
 use log::error;
-use data::{FacesRequest, FacesResponse, NumberOfImagesResponse, SearchParams, SearchResponse};
+use data::{FacesRequest, FacesResponse, DatabaseStatusResponse, SearchParams, SearchResponse};
 use crate::AppState;
 
 pub async fn web_search_text<B: Backend>(
@@ -74,11 +74,11 @@ pub async fn web_get_faces<B: Backend>(
     Ok(Json(result))
 }
 
-pub async fn web_get_number_of_images<B: Backend>(
+pub async fn web_get_database_status<B: Backend>(
     State(state): State<AppState<B>>,
-) -> Result<Json<NumberOfImagesResponse>, StatusCode> {
+) -> Result<Json<DatabaseStatusResponse>, StatusCode> {
     let result = state.query_service
-        .get_number_of_images(&state.db)
+        .get_database_status(&state.db)
         .await
         .map_err(|err| {
             error!("Get number of images failed: {:?}", err);

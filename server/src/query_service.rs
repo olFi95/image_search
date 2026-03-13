@@ -5,7 +5,7 @@ use serde::Serialize;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb_types::SurrealValue;
-use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, NumberOfImagesResponse, SearchParams, SearchResponse};
+use data::{FaceBoundingBox, FacesRequest, FacesResponse, ImageReference, DatabaseStatusResponse, SearchParams, SearchResponse};
 use crate::DbImage;
 use crate::metadata_provider::metadata_query_engine::MetadataQueryEngine;
 use crate::metadata_provider::model::BaseImage;
@@ -173,22 +173,30 @@ impl<B: Backend> QueryService<B> {
         Ok(FacesResponse { faces })
     }
 
-    pub async fn get_number_of_images(
+    pub async fn get_database_status(
         &self,
         db: &Surreal<Any>,
-    ) -> Result<NumberOfImagesResponse> {
+    ) -> Result<DatabaseStatusResponse> {
 
         let mut response = db
-            .query("SELECT count() AS total FROM base_image GROUP ALL;")
+            .query(r#"
+            SELECT
+                (SELECT count() FROM base_image GROUP ALL)[0].count AS total_images,
+                (SELECT count() FROM face_in_picture GROUP ALL)[0].count AS detected_faces
+            FROM 1;"#
+            )
             .await
             .context("DB query error")?;
 
-        let rows: Vec<NumOfImagesResult> = response.take(0)
+        let rows: Vec<DatabaseStatus> = response.take(0)
             .context("Failed to deserialize response")?;
 
-        let total = rows.first().map(|r| r.total).unwrap_or(0);
+        let status = rows.first().expect("cannot get database status");
 
-        Ok(NumberOfImagesResponse { images: total })
+        Ok(DatabaseStatusResponse{
+            total_images: status.total_images,
+            detected_faces: status.detected_faces,
+        })
     }
 
     fn average_slices(vectors: &Vec<&Vec<f32>>) -> Vec<f32> {
@@ -218,8 +226,9 @@ impl<B: Backend> QueryService<B> {
 }
 
 #[derive(Debug, Serialize, SurrealValue)]
-struct NumOfImagesResult {
-    total: u32,
+struct DatabaseStatus {
+    total_images: u32,
+    detected_faces: u32,
 }
 
 #[cfg(test)]

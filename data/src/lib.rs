@@ -72,7 +72,8 @@ pub struct FacesResponse {
     pub faces: Vec<FaceBoundingBox>,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NumberOfImagesResponse {
-    pub images: u32,
+pub struct DatabaseStatusResponse {
+    pub total_images: u32,
+    pub detected_faces: u32,
 }
 
