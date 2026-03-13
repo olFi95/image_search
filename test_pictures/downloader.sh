@@ -8,10 +8,15 @@
 set -euo pipefail
 
 # Configuration
-MAX_RETRIES=3
-RETRY_DELAY=2
-TIMEOUT=15
+MAX_RETRIES=5
+RETRY_DELAY=5
+TIMEOUT=30
 PARALLEL_JOBS=5
+
+# Rate limiting configuration
+RATE_LIMIT_DELAY=1.0  # Delay between requests in seconds (1 second)
+REQUEST_BURST_SIZE=10 # Number of requests before enforcing a longer delay
+BURST_DELAY=5         # Longer delay after burst (in seconds)
 
 # Colors for output
 RED='\033[0;31m'
@@ -27,17 +32,19 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # Default TSV file URL and local path
 TSV_URL="https://storage.googleapis.com/cvdf-datasets/oid/open-images-dataset-test.tsv"
 DEFAULT_TSV_FILE="$(dirname "$0")/open-images-dataset-test.tsv"
+OUTPUT_FOLDER="$(dirname "$0")/openimage"
 
 # Display usage information
 usage() {
-    echo -e "${BLUE}Usage:${NC} $0 <output_folder> <num_images> [parallel_jobs]"
+    echo -e "${BLUE}Usage:${NC} $0 <num_images> [parallel_jobs]"
     echo ""
     echo "Arguments:"
-    echo "  <output_folder>  Destination folder for downloaded images"
     echo "  <num_images>     Maximum number of images to download"
     echo "  [parallel_jobs]  Optional: Number of parallel downloads (default: $PARALLEL_JOBS)"
     echo ""
-    echo "Example: $0 downloaded_images 100 10"
+    echo "Output folder: $OUTPUT_FOLDER (hard-coded)"
+    echo ""
+    echo "Example: $0 100 10"
     echo ""
     echo "The script automatically downloads the Open Images Dataset TSV file if not present."
     echo "TSV Source: $TSV_URL"
@@ -100,24 +107,60 @@ download_image() {
 
     local file_path="$output_folder/$filename"
 
-    # Skip if file already exists and is not empty
+    # Skip if file already exists and is not empty (local check only, no server access)
     if [ -f "$file_path" ] && [ -s "$file_path" ]; then
         log_warning "File already exists, skipping: $filename"
         echo "skipped" >> "$TEMP_DIR/skipped.count"
         return 0
     fi
 
+    # Rate limiting: Add delay before download
+    sleep "$RATE_LIMIT_DELAY"
+
+    # Add longer delay after burst
+    if [ $((index % REQUEST_BURST_SIZE)) -eq 0 ] && [ "$index" -gt 0 ]; then
+        sleep "$BURST_DELAY"
+    fi
+
     # Download with retry logic
     local attempt=1
     while [ $attempt -le $MAX_RETRIES ]; do
-        if curl -s -L \
+        # Capture HTTP status code
+        local http_code
+        http_code=$(curl -s -L \
             --max-time "$TIMEOUT" \
             --retry 0 \
-            --fail \
             --output "$file_path" \
             --write-out "%{http_code}" \
-            "$url" > /dev/null 2>&1; then
+            "$url" 2>/dev/null || echo "000")
 
+        # Check for specific HTTP status codes
+        if [ "$http_code" == "404" ]; then
+            log_warning "Image not found (404), skipping: $filename"
+            rm -f "$file_path"
+            echo "skipped" >> "$TEMP_DIR/skipped.count"
+            return 0
+        fi
+
+        if [ "$http_code" == "410" ]; then
+            log_warning "Image permanently deleted (410 Gone), skipping: $filename"
+            rm -f "$file_path"
+            echo "skipped" >> "$TEMP_DIR/skipped.count"
+            return 0
+        fi
+
+        if [ "$http_code" == "429" ]; then
+            # Rate limited - wait longer before retry
+            local rate_limit_wait=$((RETRY_DELAY * 2 * attempt))
+            log_warning "Rate limited (429), waiting ${rate_limit_wait}s before retry $attempt/$MAX_RETRIES: $filename"
+            rm -f "$file_path"
+            sleep "$rate_limit_wait"
+            attempt=$((attempt + 1))
+            continue
+        fi
+
+        # Check if download was successful (2xx status codes)
+        if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
             # Verify the downloaded file is valid (not empty and is an image)
             if [ -s "$file_path" ]; then
                 # Check if file is a valid image using file command
@@ -125,7 +168,7 @@ download_image() {
                 file_type=$(file -b --mime-type "$file_path" 2>/dev/null || echo "unknown")
 
                 if [[ "$file_type" == image/* ]]; then
-                    log_success "Downloaded: $filename"
+                    log_success "Downloaded: $filename (HTTP $http_code)"
                     echo "success" >> "$TEMP_DIR/success.count"
                     return 0
                 else
@@ -135,6 +178,10 @@ download_image() {
             else
                 rm -f "$file_path"
             fi
+        else
+            # Other error codes (5xx, 3xx, etc.)
+            log_warning "HTTP $http_code for: $filename (attempt $attempt/$MAX_RETRIES)"
+            rm -f "$file_path"
         fi
 
         if [ $attempt -lt $MAX_RETRIES ]; then
@@ -143,7 +190,7 @@ download_image() {
         attempt=$((attempt + 1))
     done
 
-    log_error "Failed after $MAX_RETRIES attempts: $url"
+    log_error "Failed after $MAX_RETRIES attempts (last HTTP code: $http_code): $url"
     echo "failed" >> "$TEMP_DIR/failed.count"
     return 1
 }
@@ -151,15 +198,15 @@ download_image() {
 # Export functions for parallel execution
 export -f download_image log_info log_success log_warning log_error
 export RED GREEN YELLOW BLUE NC MAX_RETRIES RETRY_DELAY TIMEOUT TEMP_DIR
+export RATE_LIMIT_DELAY REQUEST_BURST_SIZE BURST_DELAY
 
 # Validate arguments
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
     usage
 fi
 
-OUTPUT_FOLDER="$1"
-NUM_IMAGES="$2"
-PARALLEL_JOBS="${3:-$PARALLEL_JOBS}"
+NUM_IMAGES="$1"
+PARALLEL_JOBS="${2:-$PARALLEL_JOBS}"
 
 # Check dependencies
 if ! command -v curl &> /dev/null; then
