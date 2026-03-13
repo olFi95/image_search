@@ -1,0 +1,20 @@
+[package]
+name = "downloader"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "downloader"
+path = "src/main.rs"
+
+[dependencies]
+anyhow     = { workspace = true }
+clap       = { workspace = true }
+image      = { workspace = true }
+tokio      = { workspace = true }
+reqwest    = { workspace = true, default-features = false, features = ["rustls", "stream"] }
+governor   = { workspace = true }
+
+
+
+

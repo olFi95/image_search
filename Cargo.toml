@@ -1,5 +1,5 @@
 [workspace]
-members = ["client", "data", "ai_models", "server", "onnx_updater"]
+members = ["client", "data", "ai_models", "server", "onnx_updater", "downloader"]
 resolver = "3"
 default-members = ["server"]
 
@@ -52,6 +52,8 @@ bytemuck = "1.25.0"
 sha2 = "0.11.0-rc.5"
 hex = "0.4.3"
 rmcp = { version = "1.1.1", features = ["transport-streamable-http-server"] }
+reqwest    = { version = "0.13.2", default-features = false, features = ["rustls", "stream"] }
+governor   = "0.10.4"
 
 [profile.dev.package.ai_models]
 opt-level = 3
