@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 use crate::query_service::QueryService;
 use crate::database::init_database;
-use crate::search::{indexing};
+use crate::search::{indexing, IndexingStatus};
 use crate::server_arguments::ServerArguments;
 use ai_models::clip_embedder::ClipEmbedder;
 use anyhow::Context;
@@ -55,6 +55,7 @@ pub struct AppState<B: Backend> {
     pub db: Surreal<Any>,
     pub clip_embedder: Arc<Mutex<ClipEmbedder<B>>>,
     pub query_service: QueryService<B>,
+    pub indexing_status: Arc<Mutex<IndexingStatus>>,
 }
 
 fn init_logging() -> anyhow::Result<()> {
@@ -90,6 +91,7 @@ async fn tokio_main() -> anyhow::Result<()> {
         db: surreal_db_client,
         clip_embedder: Arc::new(Mutex::new(ClipEmbedder::<NdArray>::new(cla.clip_vision_weights.as_str(), cla.clip_text_weights.as_str(), NdArrayDevice::Cpu))),
         query_service: QueryService::new(),
+        indexing_status: Arc::new(Mutex::new(IndexingStatus::Idle)),
     };
     let media_dir = cla.shellexpand_media_dir()?;
     let app = Router::new()

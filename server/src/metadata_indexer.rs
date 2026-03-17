@@ -16,7 +16,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
+use tokio::sync::Mutex;
 use tracing::{debug, error};
+use crate::search::IndexingStatus;
 
 const BUFFER: usize = 100;
 const BATCH: usize = 25;
@@ -59,7 +61,7 @@ where
         }
     }
 
-    pub async fn index_metadata(&self, path: PathBuf) -> anyhow::Result<()> {
+    pub async fn index_metadata(&self, path: PathBuf, index_state: Arc<Mutex<IndexingStatus>>) -> anyhow::Result<()> {
         let total_start = Instant::now();
 
         let all_image_paths: Vec<PathBuf> = get_all_directories_in_dir(&path)
@@ -69,7 +71,10 @@ where
 
         let total_images = all_image_paths.len();
         info!("Starting indexing of {} images in {}", total_images, path.to_str().unwrap_or("provided path"));
-
+        *index_state.lock_owned().await = IndexingStatus::InProgress(crate::search::IndexState {
+            total: total_images as u32,
+            progress: 0,
+        });
         let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
         let producer = {
             tokio::spawn(async move {
