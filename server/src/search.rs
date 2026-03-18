@@ -26,7 +26,7 @@ pub enum IndexingStatus {
 pub struct IndexState {
     pub(crate) total: u32,
     pub(crate) already_indexed: u32,
-    pub(crate) progress: u32,
+    pub(crate) indexed: u32,
 }
 
 pub async fn get_indexing<B: Backend>(State(state): State<AppState<B>>) -> impl IntoResponse {

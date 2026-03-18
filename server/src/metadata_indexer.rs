@@ -74,7 +74,7 @@ where
         *index_state.clone().lock_owned().await = IndexingStatus::InProgress(crate::search::IndexState {
             total: total_images as u32,
             already_indexed: 0,
-            progress: 0,
+            indexed: 0,
         });
         let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
         let producer = {
@@ -626,8 +626,8 @@ where
                     repo.insert_many_image_embeddings(&batch).await.unwrap();
                     match *index_state.clone().lock_owned().await  {
                         IndexingStatus::InProgress(ref mut state) => {
-                            debug!("Progress update: +{} embeddings. Previous progress: {}/{}", batch.len(), state.progress, state.total);
-                            state.progress += batch.len() as u32;
+                            debug!("Progress update: +{} embeddings. Previous progress: {}/{}", batch.len(), state.indexed, state.total);
+                            state.indexed += batch.len() as u32;
                         }
                         _ => {
                             error!("Indexing status was expected to be InProgress, but was not.");
