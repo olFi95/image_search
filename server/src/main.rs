@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 use crate::query_service::QueryService;
 use crate::database::init_database;
-use crate::search::{indexing, IndexingStatus};
+use crate::search::{get_indexing, start_indexing, IndexingStatus};
 use crate::server_arguments::ServerArguments;
 use ai_models::clip_embedder::ClipEmbedder;
 use anyhow::Context;
@@ -99,7 +99,8 @@ async fn tokio_main() -> anyhow::Result<()> {
         .route("/faces", post(handlers::web_get_faces))
         .route("/similar_faces", post(handlers::web_get_similar_faces))
         .route("/database_status", get(handlers::web_get_database_status))
-        .route("/scan", get(indexing))
+        .route("/scan", get(start_indexing))
+        .route("/scan_status", get(get_indexing))
         .with_state(app_state)
         .nest_service("/media", ServeDir::new(&media_dir))
         .fallback_service(

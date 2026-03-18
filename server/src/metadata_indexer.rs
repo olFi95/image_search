@@ -71,8 +71,9 @@ where
 
         let total_images = all_image_paths.len();
         info!("Starting indexing of {} images in {}", total_images, path.to_str().unwrap_or("provided path"));
-        *index_state.lock_owned().await = IndexingStatus::InProgress(crate::search::IndexState {
+        *index_state.clone().lock_owned().await = IndexingStatus::InProgress(crate::search::IndexState {
             total: total_images as u32,
+            already_indexed: 0,
             progress: 0,
         });
         let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
@@ -113,6 +114,7 @@ where
         let (tx_base_with_id, rx_base_with_id) = bounded::<BaseImage>(BUFFER);
         let base_image_saver = {
             let repo = BaseImageRepository::new(self.db.clone()).await;
+            let index_state = index_state.clone();
             tokio::spawn(async move {
                 let mut skipped = 0usize;
                 loop {
@@ -129,6 +131,14 @@ where
                         .collect();
 
                     skipped += already_indexed.len();
+                    match *index_state.clone().lock_owned().await  {
+                        IndexingStatus::InProgress(ref mut state) => {
+                            state.already_indexed += already_indexed.len() as u32;
+                        }
+                        _ => {
+                            error!("Indexing status was expected to be InProgress, but was not.");
+                        }
+                    }
 
                     for base in new_images {
                         if tx_base_with_id.len() >= BUFFER {
@@ -603,7 +613,9 @@ where
                 }
             })
         };
+
         let embedding_saver = {
+            let index_state = index_state.clone();
             let repo = ImageEmbeddingMetadataRepository::new(self.db.clone()).await;
             tokio::spawn(async move {
                 loop {
@@ -612,6 +624,15 @@ where
                     trace!("saving {} image embeddings, {} in queue", batch.len(), rx_image_embedding.len());
                     if batch.is_empty() { break; }
                     repo.insert_many_image_embeddings(&batch).await.unwrap();
+                    match *index_state.clone().lock_owned().await  {
+                        IndexingStatus::InProgress(ref mut state) => {
+                            debug!("Progress update: +{} embeddings. Previous progress: {}/{}", batch.len(), state.progress, state.total);
+                            state.progress += batch.len() as u32;
+                        }
+                        _ => {
+                            error!("Indexing status was expected to be InProgress, but was not.");
+                        }
+                    }
                 }
             })
         };
