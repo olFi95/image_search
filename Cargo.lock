@@ -8828,7 +8828,6 @@ dependencies = [
  "bytemuck",
  "chrono",
  "clap",
- "crossbeam-channel",
  "data",
  "env_logger",
  "expanduser",

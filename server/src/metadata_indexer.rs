@@ -7,7 +7,6 @@ use crate::metadata_provider::image_hash_metadata_provider::{ImageHashMetadata, 
 use crate::metadata_provider::model::{BaseImage, BaseImageRepository, BaseImageWithImage, Metadata, MetadataProvider};
 use burn::prelude::Backend;
 use burn::tensor::Device;
-use crossbeam_channel::{bounded, Receiver};
 use log::{info, trace};
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
@@ -16,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use surrealdb::{Connection, Surreal};
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 use tracing::{debug, error};
 use crate::search::IndexingStatus;
@@ -76,7 +76,7 @@ where
             already_indexed: 0,
             indexed: 0,
         });
-        let (tx_base_image, rx_base_image) = bounded::<BaseImage>(BUFFER);
+        let (tx_base_image, mut rx_base_image) = tokio::sync::mpsc::channel(BUFFER);
         let producer = {
             tokio::spawn(async move {
                 let mut last_log_time = Instant::now();
@@ -85,33 +85,14 @@ where
 
                 for path in all_image_paths {
                     let base = BaseImage::new(path);
-                    loop {
-                        match tx_base_image.try_send(base.clone()) {
-                            Ok(_) => break,
-                            Err(err) if err.is_full() => {
-                                if last_log_time.elapsed().as_secs() >= 5 {
-                                    trace!("Producer waiting, send-queue full. slept {waited_ms_since_last_log} ms.");
-                                    last_log_time = Instant::now();
-                                    waited_ms_since_last_log = 0;
-                                } else {
-                                    waited_ms_since_last_log +=1;
-                                    total_stalled_time +=1;
-                                }
-                                tokio::time::sleep(Duration::from_millis(1)).await;
-                            }
-                            Err(err) => {
-                                error!("Producer error while sending: {:?}", err);
-                                break;
-                            }
-                        }
-                    }
+                    tx_base_image.send(base.clone()).await.expect("cannot send base_image");
                 }
                 trace!("drop(tx_base_image)");
                 debug!("Producer finished sending base images. Total stalled time: {total_stalled_time} ms.");
                 drop(tx_base_image);
             })
         };
-        let (tx_base_with_id, rx_base_with_id) = bounded::<BaseImage>(BUFFER);
+        let (tx_base_with_id, mut rx_base_with_id) = tokio::sync::mpsc::channel(BUFFER);
         let base_image_saver = {
             let repo = BaseImageRepository::new(self.db.clone()).await;
             let index_state = index_state.clone();
@@ -119,7 +100,7 @@ where
                 let mut skipped = 0usize;
                 loop {
                     trace!("base_image_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_base_image, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_base_image, BATCH).await;
                     if batch.is_empty() { break; }
                     let inserted = repo.insert_many(batch).await.unwrap();
 
@@ -141,13 +122,7 @@ where
                     }
 
                     for base in new_images {
-                        if tx_base_with_id.len() >= BUFFER {
-                            trace!("base_image_saver waiting, ");
-                        }
-                        if tx_base_with_id.send(base).is_err() {
-                            error!("base_image_saver error while sending");
-                            break;
-                        }
+                        tx_base_with_id.send(base).await.expect("cannot send base_image_with_id");
                     }
                 }
                 trace!("drop(tx_base_with_id)");
@@ -156,10 +131,10 @@ where
             })
         };
 
-        let (tx_loaded, rx_loaded) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
-        let (tx_for_embedding, rx_for_embedding) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
-        let (tx_for_basic_metadata, rx_for_basic_metadata) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
-        let (tx_for_face, rx_for_face) = bounded::<Arc<BaseImageWithImage>>(BUFFER);
+        let (tx_loaded, mut rx_loaded) = tokio::sync::mpsc::channel(BUFFER);
+        let (tx_for_embedding, mut rx_for_embedding) = tokio::sync::mpsc::channel(BUFFER);
+        let (tx_for_basic_metadata, mut rx_for_basic_metadata) = tokio::sync::mpsc::channel(BUFFER);
+        let (tx_for_face, mut rx_for_face) = tokio::sync::mpsc::channel(BUFFER);
 
         let image_loader = {
             tokio::spawn(async move {
@@ -169,7 +144,7 @@ where
 
                 loop {
                     trace!("image_loader waiting for entries");
-                    let batch = collect_batch_async(&rx_base_with_id, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_base_with_id, BATCH).await;
                     trace!("loading batch of {} images, {} in queue", batch.len(), rx_base_with_id.len());
 
                     if batch.is_empty() {
@@ -185,29 +160,7 @@ where
                         .collect();
 
                     for img in loaded_images {
-
-                        loop {
-                            match tx_loaded.try_send(Arc::clone(&img)) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_loader waiting, send-queue full. slept {waited_ms_since_last_log} ms.");
-                                        last_log_time = Instant::now();
-                                        waited_ms_since_last_log = 0;
-                                    } else {
-                                        waited_ms_since_last_log +=1;
-                                        total_stalled_time +=1;
-                                    }
-
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                }
-                                Err(err) => {
-                                    error!("image_loader send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_loaded.send(Arc::clone(&img)).await.expect("")
                     }
                 }
                 trace!("drop(tx_loaded)");
@@ -233,7 +186,7 @@ where
 
                 loop {
                     trace!("image_dispatcher waiting for entries");
-                    let batch = collect_batch_async(&rx_loaded, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_loaded, BATCH).await;
                     trace!(
                         "image_dispatcher distributing batch of {} images, {} in queue",
                         batch.len(),
@@ -246,67 +199,9 @@ where
                     }
 
                     for img in batch {
-
-                        loop {
-                            match tx_for_embedding.try_send(Arc::clone(&img)) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time_embedding.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_embedding-queue full. slept {waited_ms_since_last_log_embedding} ms.");
-                                        last_log_time_embedding = Instant::now();
-                                        waited_ms_since_last_log_embedding = 0;
-                                    } else {
-                                        waited_ms_since_last_log_embedding += 1;
-                                        total_stalled_time_embedding += 1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-                                }
-                                Err(err) => {
-                                    error!("image_dispatcher send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
-                        loop {
-                            match tx_for_basic_metadata.try_send(Arc::clone(&img)) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time_basic.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_basic_metadata-queue full. slept {waited_ms_since_last_log_basic} ms.");
-                                        last_log_time_basic = Instant::now();
-                                        waited_ms_since_last_log_basic = 0;
-                                    } else {
-                                        waited_ms_since_last_log_basic += 1;
-                                        total_stalled_time_basic += 1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-                                }
-                                Err(err) => {
-                                    error!("image_dispatcher send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
-                        loop {
-                            match tx_for_face.try_send(Arc::clone(&img)) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time_face.elapsed().as_secs() >= 5 {
-                                        trace!("image_dispatcher waiting, tx_for_face-queue full. slept {waited_ms_since_last_log_face} ms.");
-                                        last_log_time_face = Instant::now();
-                                        waited_ms_since_last_log_face = 0;
-                                    } else {
-                                        waited_ms_since_last_log_face += 1;
-                                        total_stalled_time_face += 1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-                                }
-                                Err(err) => {
-                                    error!("image_dispatcher send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_for_embedding.send(Arc::clone(&img));
+                        tx_for_basic_metadata.try_send(Arc::clone(&img));
+                        tx_for_face.try_send(Arc::clone(&img));
                     }
                 }
                 trace!("drop(tx_for_embedding, tx_for_basic_metadata, tx_for_face)");
@@ -318,8 +213,8 @@ where
             })
         };
 
-        let (tx_hash, rx_hash) = bounded::<Metadata<ImageHashMetadata>>(BUFFER);
-        let (tx_basic, rx_basic) = bounded::<Metadata<BasicMetadata>>(BUFFER);
+        let (tx_hash, mut rx_hash) = tokio::sync::mpsc::channel(BUFFER);
+        let (tx_basic, mut rx_basic) = tokio::sync::mpsc::channel(BUFFER);
         let basic_extractor = {
 
             tokio::spawn(async move {
@@ -337,7 +232,7 @@ where
 
                 loop {
                     trace!("basic_extractor waiting for entries");
-                    let batch = collect_batch_async(&rx_for_basic_metadata, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_for_basic_metadata, BATCH).await;
                     trace!(
                 "extracting basic+hash metadata for {} images, {} in queue",
                 batch.len(),
@@ -350,51 +245,11 @@ where
                     let basics = basic_provider.extract(&batch).unwrap();
 
                     for h in hashes {
-                        loop {
-                            match tx_hash.try_send(h.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time_hash.elapsed().as_secs() >= 5 {
-                                        trace!("basic_extractor (hash) waiting, tx_hash-queue full. slept {waited_ms_since_last_log_hash} ms.");
-                                        last_log_time_hash = Instant::now();
-                                        waited_ms_since_last_log_hash =0;
-                                    } else {
-                                        waited_ms_since_last_log_hash +=1;
-                                        total_stalled_time_hash+=1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                }
-                                Err(err) => {
-                                    error!("basic_extractor (hash) send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_hash.try_send(h.clone());
                     }
 
                     for b in basics {
-                        loop {
-                            match tx_basic.try_send(b.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time_basic.elapsed().as_secs() >= 5 {
-                                        trace!("basic_extractor (basic) waiting, tx_basic-queue full. slept {waited_ms_since_last_log_basic} ms.");
-                                        last_log_time_basic = Instant::now();
-                                        waited_ms_since_last_log_basic =0;
-                                    } else {
-                                        waited_ms_since_last_log_basic +=1;
-                                        total_stalled_time_basic+=1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                }
-                                Err(err) => {
-                                    error!("basic_extractor (basic) send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_basic.try_send(b.clone());
                     }
                 }
                 trace!("drop(tx_hash, tx_basic)");
@@ -406,7 +261,7 @@ where
         let image_embedder_device = self.device.clone();
         let clip_vision_model = self.clip_vision.clone();
         let clip_text_model = self.clip_text.clone();
-        let (tx_image_embedding, rx_image_embedding) = bounded::<Metadata<ImageEmbedding>>(BUFFER);
+        let (tx_image_embedding, mut rx_image_embedding) = tokio::sync::mpsc::channel(BUFFER);
         let image_embedder = {
             tokio::spawn(async move {
                 let provider: ImageEmbeddingMetadataProvider<B> =
@@ -418,7 +273,7 @@ where
 
                 loop {
                     trace!("image_embedder waiting for entries");
-                    let batch = collect_batch_async(&rx_for_embedding, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_for_embedding, BATCH).await;
                     trace!(
                         "embedding {} images, {} in queue",
                         batch.len(),
@@ -429,26 +284,7 @@ where
                     let embeddings = provider.extract(&batch).expect("cannot embed images");
 
                     for e in embeddings {
-                        loop {
-                            match tx_image_embedding.try_send(e.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    if last_log_time.elapsed().as_secs() >= 5 {
-                                        trace!("image_embedder waiting, tx_image_embedding-queue full. slept {waited_ms_since_last_log} ms.");
-                                        last_log_time = Instant::now();
-                                        waited_ms_since_last_log = 0;
-                                    } else {
-                                        waited_ms_since_last_log +=1;
-                                        total_stalled_time +=1;
-                                    }
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-                                }
-                                Err(err) => {
-                                    error!("image_embedder send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_image_embedding.try_send(e.clone());
                     }
                 }
                 trace!("drop(tx_image_embedding)");
@@ -460,8 +296,8 @@ where
         let face_recognition_device = self.device.clone();
         let face_detection_model = self.face_detector.clone();
         let face_embedding_model = self.face_embedder.clone();
-        let (tx_face_for_db, rx_face_for_db) = bounded::<Metadata<FaceInPicture>>(BUFFER);
-        let (tx_face_embedding, rx_face_embedding) = bounded::<Metadata<FaceInPictureVector>>(BUFFER);
+        let (tx_face_for_db, mut rx_face_for_db) = tokio::sync::mpsc::channel(BUFFER);
+        let (tx_face_embedding, mut rx_face_embedding) = tokio::sync::mpsc::channel(BUFFER);
 
         let face_embedder = {
             let provider: FaceRecognitionMetadataProvider<B> = FaceRecognitionMetadataProvider::new(
@@ -473,7 +309,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("face_embedder waiting for entries");
-                    let batch = collect_batch_async(&rx_for_face, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_for_face, BATCH).await;
                     trace!("detecting faces in {} images, {} in queue", batch.len(), rx_for_face.len());
 
                     if batch.is_empty() { break; }
@@ -481,35 +317,12 @@ where
                     let faces = provider.extract(&batch).expect("cannot detect faces");
 
                     for face in faces.iter() {
-                        loop {
-                            match tx_face_for_db.try_send(face.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-                                }
-                                Err(err) => {
-                                    error!("Failed to send face_for_db: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_face_for_db.try_send(face.clone());
                     }
 
                     let face_embeddings = provider.extract(&faces).expect("cannot embed faces");
                     for fe in face_embeddings {
-                        loop {
-                            match tx_face_embedding.try_send(fe.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                }
-                                Err(err) => {
-                                    error!("Failed to send face_embedding: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_face_embedding.try_send(fe.clone());
                     }
                 }
                 trace!("drop(tx_face_for_db, tx_face_embedding)");
@@ -519,25 +332,16 @@ where
             })
         };
 
-        let (tx_face_for_age_gender_with_id, rx_face_for_age_gender_with_id) = bounded::<Metadata<FaceInPicture>>(BUFFER);
+        let (tx_face_for_age_gender_with_id, mut rx_face_for_age_gender_with_id) = tokio::sync::mpsc::channel(BUFFER);
         let face_in_picture_saver = {
             let repo = FaceRecognitionMetadataRepository::new(self.db.clone()).await;
             tokio::spawn(async move {
                 loop {
-                    let batch = collect_batch_async(&rx_face_for_db, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_face_for_db, BATCH).await;
                     if batch.is_empty() { break; }
                     let saved = repo.insert_many_face_in_picture(&batch).await.unwrap();
                     for face in saved {
-                        while let Err(err) = tx_face_for_age_gender_with_id.try_send(face.clone()) {
-                            if err.is_full() {
-                                tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                continue;
-                            } else {
-                                error!("Failed to send: {:?}", err);
-                                break;
-                            }
-                        }
+                        tx_face_for_age_gender_with_id.try_send(face.clone());
                     }
                 }
                 trace!("drop(tx_face_for_age_gender_with_id)");
@@ -547,7 +351,7 @@ where
         };
         let face_age_gender_device = self.device.clone();
         let face_age_gender_model = self.face_age_and_gender.clone();
-        let (tx_age_gender, rx_age_gender) = bounded::<Metadata<FaceAgeAndGender>>(BUFFER);
+        let (tx_age_gender, mut rx_age_gender) = tokio::sync::mpsc::channel(BUFFER);
         let age_gender_estimator = {
             tokio::spawn(async move {
                 let provider: AgeAndGenderMetadataProvider<B> =
@@ -555,7 +359,7 @@ where
 
                 loop {
                     trace!("age_gender_estimator waiting for entries");
-                    let batch = collect_batch_async(&rx_face_for_age_gender_with_id, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_face_for_age_gender_with_id, BATCH).await;
                     trace!(
                 "estimating age+gender for {} faces, {} in queue",
                 batch.len(),
@@ -567,20 +371,7 @@ where
                     let results = provider.extract(&batch).expect("cannot estimate age and gender");
 
                     for r in results {
-                        loop {
-                            match tx_age_gender.try_send(r.clone()) {
-                                Ok(_) => break,
-                                Err(err) if err.is_full() => {
-                                    trace!("age_gender_estimator waiting, send-queue full");
-                                    tokio::time::sleep(Duration::from_millis(1)).await;
-
-                                }
-                                Err(err) => {
-                                    error!("age_gender_estimator send error: {:?}", err);
-                                    break;
-                                }
-                            }
-                        }
+                        tx_age_gender.try_send(r.clone());
                     }
                 }
                 trace!("drop(tx_age_gender)");
@@ -594,7 +385,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("hash_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_hash, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_hash, BATCH).await;
                     trace!("saving {} image hashes, {} in queue", batch.len(), rx_hash.len());
                     if batch.is_empty() { break; }
                     repo.insert_many(&batch).await.unwrap();
@@ -606,7 +397,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("basic_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_basic, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_basic, BATCH).await;
                     trace!("saving {} basic metadata entries, {} in queue", batch.len(), rx_basic.len());
                     if batch.is_empty() { break; }
                     repo.insert_many(&batch).await.unwrap();
@@ -620,7 +411,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("embedding_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_image_embedding, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_image_embedding, BATCH).await;
                     trace!("saving {} image embeddings, {} in queue", batch.len(), rx_image_embedding.len());
                     if batch.is_empty() { break; }
                     repo.insert_many_image_embeddings(&batch).await.unwrap();
@@ -641,7 +432,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("face_embedding_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_face_embedding, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_face_embedding, BATCH).await;
                     trace!("saving {} face embeddings, {} in queue", batch.len(), rx_face_embedding.len());
                     if batch.is_empty() { break; }
                     repo.insert_many_face_embeddings(&batch).await.unwrap();
@@ -653,7 +444,7 @@ where
             tokio::spawn(async move {
                 loop {
                     trace!("age_gender_saver waiting for entries");
-                    let batch = collect_batch_async(&rx_age_gender, BATCH).await;
+                    let batch = collect_batch_async(&mut rx_age_gender, BATCH).await;
                     trace!("saving {} age+gender estimations, {} in queue", batch.len(), rx_age_gender.len());
                     if batch.is_empty() { break; }
                     repo.insert_many_age_and_gender(&batch).await.unwrap();
@@ -702,27 +493,25 @@ where
     }
 }
 
-async fn collect_batch_async<T: Send + 'static>(rx: &Receiver<T>, max: usize) -> Vec<T> {
-    let rx_clone = rx.clone();
-    let first = tokio::task::spawn_blocking(move || rx_clone.recv().ok()).await.unwrap();
+async fn collect_batch_async<T>(rx: &mut tokio::sync::mpsc::Receiver<T>, max: usize) -> Vec<T> {
+    let mut items = Vec::with_capacity(max);
 
-    let Some(first_item) = first else {
-        return Vec::new(); // channel closed
+    let Some(first_item) = rx.recv().await else {
+        return Vec::new();
     };
 
-    let mut items = Vec::with_capacity(max);
     items.push(first_item);
 
     while items.len() < max {
         match rx.try_recv() {
             Ok(item) => items.push(item),
-            Err(_) => break,
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
+            Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
         }
     }
 
     items
 }
-
 #[cfg(test)]
 mod test {
     use crate::metadata_indexer::MetadataIndexer;
