@@ -278,12 +278,13 @@ struct DatabaseStatus {
 
 #[cfg(test)]
 mod tests {
+    use burn_ndarray::NdArray;
     use super::*;
     #[test]
     fn tes_average_vector() {
         let a = vec![1.0, 2.0, 4.0, 4.0, 10.0];
         let b = vec![1.0, 1.0, 2.0, 4.0, 0.0];
-        let result = QueryService::average_slices(&vec![&a, &b]);
+        let result = QueryService::<NdArray>::average_slices(&vec![&a, &b]);
         assert_eq!(result, vec![1.0, 1.5, 3.0, 4.0, 5.0]);
     }
 }
