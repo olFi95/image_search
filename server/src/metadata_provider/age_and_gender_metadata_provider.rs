@@ -6,6 +6,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::SurrealValue;
+use surrealdb_types::RecordIdKey;
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceAgeAndGender {

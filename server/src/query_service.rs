@@ -159,6 +159,7 @@ impl<B: Backend> QueryService<B> {
             .map(|face| {
                 let age_gender = face.age_and_gender.first();
                 FaceBoundingBox {
+                    id: face.id_string(),
                     top_left_x: face.top_left_x,
                     top_left_y: face.top_left_y,
                     bottom_right_x: face.bottom_right_x,

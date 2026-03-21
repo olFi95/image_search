@@ -73,6 +73,7 @@ pub struct FacesRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceBoundingBox {
+    pub id: String,
     pub top_left_x: f32,
     pub top_left_y: f32,
     pub bottom_right_x: f32,

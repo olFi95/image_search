@@ -7,6 +7,7 @@ use crate::metadata_provider::model::BaseImage;
 use serde::{Deserialize, Serialize};
 use surrealdb::{Connection, Surreal};
 use surrealdb::types::{RecordId, SurrealValue};
+use surrealdb_types::RecordIdKey;
 
 pub struct MetadataQueryEngine<C: Connection> {
     db: Surreal<C>
@@ -14,6 +15,7 @@ pub struct MetadataQueryEngine<C: Connection> {
 
 #[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct FaceInPictureWithMetadata {
+    pub id: RecordId,
     pub top_left_x: f32,
     pub top_left_y: f32,
     pub bottom_right_x: f32,
@@ -22,6 +24,24 @@ pub struct FaceInPictureWithMetadata {
     pub embedding: Vec<FaceInPictureVector>,
     pub age_and_gender: Vec<FaceAgeAndGender>,
 }
+
+impl FaceInPictureWithMetadata {
+    pub fn id_string(&self) -> String {
+        let key_string = match &self.id.key {
+            RecordIdKey::String(s) => s.to_string(),
+            RecordIdKey::Number(n) => n.to_string(),
+            RecordIdKey::Uuid(u) => u.to_string(),
+            RecordIdKey::Array(a) => format!("{a:?}"),
+            RecordIdKey::Object(o) => format!("{o:?}"),
+            RecordIdKey::Range(r) => format!("{r:?}"),
+        };
+
+        format!("{}:{}", self.id.table, key_string)
+    }
+
+}
+
+
 #[derive(Debug, Serialize, SurrealValue, Deserialize, Clone)]
 pub struct BaseImageWithMetadata {
     pub id: Option<RecordId>,
