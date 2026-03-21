@@ -1,22 +1,22 @@
 use crate::clip::get_all_directories_in_dir;
 use crate::metadata_provider::age_and_gender_metadata_provider::{
-    AgeAndGenderMetadataProvider, FaceAgeAndGender, FaceAgeAndGenderMetadataRepository,
+    AgeAndGenderMetadataProvider, FaceAgeAndGenderMetadataRepository,
 };
 use crate::metadata_provider::basic_metadata_provider::{
-    BasicMetadata, BasicMetadataProvider, BasicMetadataRepository,
+    BasicMetadataProvider, BasicMetadataRepository,
 };
 use crate::metadata_provider::face_recognition_metadata_provider::{
-    FaceInPicture, FaceInPictureVector, FaceRecognitionMetadataProvider,
+    FaceRecognitionMetadataProvider,
     FaceRecognitionMetadataRepository,
 };
 use crate::metadata_provider::image_embedding_metadata_provider::{
-    ImageEmbedding, ImageEmbeddingMetadataProvider, ImageEmbeddingMetadataRepository,
+    ImageEmbeddingMetadataProvider, ImageEmbeddingMetadataRepository,
 };
 use crate::metadata_provider::image_hash_metadata_provider::{
-    ImageHashMetadata, ImageHashMetadataProvider, ImageHashMetadataRepository,
+    ImageHashMetadataProvider, ImageHashMetadataRepository,
 };
 use crate::metadata_provider::model::{
-    BaseImage, BaseImageRepository, BaseImageWithImage, Metadata, MetadataProvider,
+    BaseImage, BaseImageRepository, BaseImageWithImage, MetadataProvider,
 };
 use crate::search::IndexingStatus;
 use burn::prelude::Backend;
@@ -29,7 +29,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use surrealdb::{Connection, Surreal};
-use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 use tracing::{debug, error};
 
